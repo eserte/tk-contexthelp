@@ -1,10 +1,10 @@
 # -*- perl -*-
 
 #
-# $Id: ContextHelp.pm,v 1.4 1998/02/19 17:29:06 eserte Exp $
+# $Id: ContextHelp.pm,v 1.5 1998/02/20 21:54:25 eserte Exp $
 # Author: Slaven Rezic
 #
-# Copyright (C) 1998 Slaven Rezic. All rights reserved.
+# Copyright (c) 1998 Slaven Rezic. All rights reserved.
 # This package is free software; you can redistribute it and/or
 # modify it under the same terms as Perl itself.
 #
@@ -16,7 +16,7 @@ package Tk::ContextHelp;
 use Tk::InputO;
 use strict;
 use vars qw($VERSION @ISA);
-$VERSION = '0.01';
+$VERSION = '0.02';
 @ISA = qw(Tk::Toplevel);
 
 Construct Tk::Widget 'ContextHelp';
@@ -42,15 +42,21 @@ sub Populate {
        -borderwidth     => ["SELF", "borderWidth", "BorderWidth", 1],
        -podfile         => ["METHOD", "podFile", "PodFile", $0],
        -verbose         => ["PASSIVE", "verbose", "Verbose", 1],
+       -stayactive      => ["PASSIVE", "stayActive", "StayActive", 0],
        DEFAULT          => [$w->{'label'}],
       );
 }
 
+# allowed states are:
+# - context:   change the cursor and wait for clicks on widgets
+# - wait:      wait for the user to finish the help balloon
+# - cont:      similar like context, only if -stayactive is selected
 sub activate {
     my($w, $state) = @_;
     $state = 'context' unless $state;
-    $w->deactivate unless $state eq 'wait';
-    my $top = $w->parent->toplevel;
+    $w->deactivate unless $state eq 'wait' || $state eq 'cont';
+    $state = 'context' if $state eq 'cont';
+    my $top = $w->parent; #->toplevel;
     my $inp_only = $top->InputO
       (-width  => $top->width,
        -height => $top->height,
@@ -89,7 +95,7 @@ sub _active_state {
 	    $w->deiconify;
 	    $w->raise;
 	    $w->update;
-	    $w->activate('wait');
+	    $w->activate($w->cget(-stayactive) ? 'cont' : 'wait');
 	};
 
 	# test underlying widget and its parents
@@ -164,7 +170,11 @@ sub _active_state {
 			}
 		    }
 		}
-		$w->deactivate;
+		if ($w->cget(-stayactive)) {
+		    $w->activate('context');
+		} else {
+		    $w->deactivate;
+		}
 		return;
 	    }
 	    $under = $under->parent;
@@ -324,10 +334,14 @@ additional options for the help button.
 
 =head1 AUTHOR
 
-Slaven Rezic <eserte@cs.tu-berlin.de>
+Slaven Rezic <F<eserte@cs.tu-berlin.de>>
 
 Some code and documentation is derived from Rajappa Iyer's
 B<Tk::Balloon>.
+
+Copyright (c) 1998 Slaven Rezic. All rights reserved.
+This package is free software; you can redistribute it and/or
+modify it under the same terms as Perl itself.
 
 =head1 SEE ALSO
 
