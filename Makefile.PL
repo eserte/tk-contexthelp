@@ -11,6 +11,8 @@ WriteMakefile
    {'ContextHelp.pm'   => '$(INST_LIBDIR)/ContextHelp.pm',
     'context_help.xbm' => '$(INST_LIBDIR)/context_help.xbm',
     'context_help_mask.xbm' => '$(INST_LIBDIR)/context_help_mask.xbm',
+    'context_nohelp.xbm' => '$(INST_LIBDIR)/context_nohelp.xbm',
+    'context_nohelp_mask.xbm' => '$(INST_LIBDIR)/context_nohelp_mask.xbm',
    },
    'PREREQ_PM'  => {'Tk'             => 402.002,
 		    'Tk::Pod'        => 0.4,
