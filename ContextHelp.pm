@@ -1,7 +1,7 @@
 # -*- perl -*-
 
 #
-# $Id: ContextHelp.pm,v 1.2 1998/02/18 00:05:21 eserte Exp $
+# $Id: ContextHelp.pm,v 1.3 1998/02/18 15:09:43 eserte Exp $
 # Author: Slaven Rezic
 #
 # Copyright (C) 1998 Slaven Rezic. All rights reserved.
@@ -41,6 +41,7 @@ sub Populate {
        -background      => [$w->{'label'}, "background", "Background", "#C0C080"],
        -font            => [$w->{'label'}, "font", "Font", "-*-helvetica-medium-r-normal--*-120-*-*-*-*-*-*"],
        -borderwidth     => ["SELF", "borderWidth", "BorderWidth", 1],
+       -podfile         => ["METHOD", "podFile", "PodFile", $0],
        DEFAULT          => [$w->{'label'}],
       );
 }
@@ -56,42 +57,95 @@ sub activate {
       )->place(-x => 0, -y => 0, -relwidth => 1.0, -relheight => 1.0);
     if ($state eq 'context') {
 	$inp_only->configure
-	  (-cursor => ['@' . Tk->findINC('context_help.xbm'), 'black']);
+	  (-cursor => ['@' . Tk->findINC('context_help.xbm'),
+		       Tk->findINC('context_help_mask.xbm'),
+		       'black', 'white']);
     }
     $w->{'inp_only'} = $inp_only;
     $w->{'state'} = $state;
-    $inp_only->bind('<Button-1>' => sub {
-			if ($w->{'state'} eq 'context') {
-			    my $e = $_[0]->XEvent;
-			    my($x, $y) = ($e->x, $e->y);
-			    $w->deactivate;
-			    my($rootx, $rooty) = ($x+$top->rootx,
-						  $y+$top->rooty);
-			    my $under = $top->containing($rootx, $rooty);
-			    # underlying widget and its parents
-			    while(defined $under) {
-				if (exists $w->{'msg'}{$under}) {
-				    if ($w->cget(-installcolormap)) {
-					$w->colormapwindows($top);
-				    }
-				    $w->{'label'}->configure
-				      (-text => $w->{'msg'}{$under});
-				    $w->geometry("+$rootx+$rooty");
-				    $w->deiconify;
-				    $w->raise;
-				    $w->update;
-				    $w->activate('wait');
-				    return;
-				}
-				$under = $under->parent;
-			    }
-			    $top->bell;
+    $inp_only->bind('<Button-1>' => [$w, '_active_state', $top, $inp_only]);
+    $inp_only->bind('<Button-2>' => [$w, 'deactivate']);
+    $inp_only->bind('<Button-3>' => [$w, 'deactivate']);
+    $inp_only->bind('<Key>'      => [$w, 'deactivate']); # XXX geht nicht?
+}
+
+sub _active_state {
+    my($w, $top, $inp_only) = @_;
+    if ($w->{'state'} eq 'context') {
+	my $e = $inp_only->XEvent;
+	my($x, $y) = ($e->x, $e->y);
+	$w->deactivate;
+	my($rootx, $rooty) = ($x+$top->rootx,
+			      $y+$top->rooty);
+	my $under = $top->containing($rootx, $rooty);
+	# test underlying widget and its parents
+	while(defined $under) {
+	    if (exists $w->{'msg'}{$under}) {
+		if ($w->cget(-installcolormap)) {
+		    $w->colormapwindows($top);
+		}
+		$w->{'label'}->configure
+		  (-text => $w->{'msg'}{$under});
+		$w->geometry("+$rootx+$rooty");
+		$w->deiconify;
+		$w->raise;
+		$w->update;
+		$w->activate('wait');
+		return;
+	    } elsif (exists $w->{'command'}{$under}) {
+		$w->{'command'}{$under}->($under);
+		$w->deactivate;
+		return;
+	    } elsif (exists $w->{'pod'}{$under}) {
+		if (Tk::Exists($w->{'podwindow'})) {
+		    $w->{'podwindow'}->deiconify;
+		    $w->{'podwindow'}->raise;
+		} else {
+		    eval { require Tk::Pod };
+		    if (!$@) {
+			$w->{'podwindow'} = $top->Pod(-file => $w->cget(-podfile));
+		    }
+		}
+		if (!$w->{'podwindow'}) {
+		    $top->bell; # XXX message: can't find pod and/or Tk::Pod
+		} else {
+		    my $text;
+		    # here comes the *hack*
+		    # find the Text widget of the pod window
+		    foreach ($w->{'podwindow'}{'SubWidget'}{'pod'}
+			     ->children->{'SubWidget'}{'more'}->children) {
+			if ($_->isa('Tk::Text')) {
+			    $text = $_;
+			    last;
 			}
-			$w->deactivate;
-		    });
-    $inp_only->bind('<Button-2>'  => [$w, 'deactivate']);
-    $inp_only->bind('<Button-3>'  => [$w, 'deactivate']);
-    $inp_only->bind('<Key>'       => [$w, 'deactivate']); # XXX geht nicht?
+		    }
+		    if ($text) {
+			# XXX exact or regex search?
+			$text->tag('configure', 'search',
+				   -background => 'red');
+			$text->tag('remove', 'search', qw/0.0 end/);
+			my $length = 0;
+			my $pos = $text->search(-count => \$length,
+						'--', $w->{'pod'}{$under},
+						'1.0', 'end');
+			if ($pos) {
+			    $text->tag('add', 'search',
+				       $pos, "$pos + $length char");
+			    $text->see('end');
+			    $text->see($pos);
+			} else {
+			    $top->bell; # XXX message: can't find help topic
+			}
+		    }
+		}
+		$w->deactivate;
+		return;
+	    }
+	    $under = $under->parent;
+	}
+	$top->bell; # XXX pop help window with "no help available" up?
+    }
+    $w->deactivate;
 }
 
 sub deactivate {
@@ -106,13 +160,29 @@ sub deactivate {
 
 sub attach {
     my($w, $client, %args) = @_;
-    $w->{'msg'}{$client} = delete $args{-msg};
+    $w->{'msg'}{$client}     = delete $args{-msg}     if exists $args{-msg};
+    $w->{'command'}{$client} = delete $args{-command} if exists $args{-command};
+    $w->{'pod'}{$client}     = delete $args{-pod}     if exists $args{-pod};
     $client->OnDestroy([$w, 'detach', $client]);
 }
 
 sub detach {
     my($w, $client) = @_;
     delete $w->{'msg'}{$client};
+    delete $w->{'command'}{$client};
+    delete $w->{'pod'}{$client};
+}
+
+sub podfile {
+    my($w, $file) = @_;
+    if (@_ > 1 and defined $file) {
+	if (Tk::Exists($w->{'podwindow'})) {
+	    delete $w->{'podwindow'};
+	}
+	$w->{Configure}{'podfile'} = $file;
+    } else {
+	$w->{Configure}{'podfile'};
+    }
 }
 
 sub HelpButton {
@@ -149,6 +219,6 @@ Slaven Rezic <eserte@cs.tu-berlin.de>
 
 =head1 SEE ALSO
 
-Tk::Balloon(3).
+Tk::Balloon(3), Tk::Pod(3).
 
 =cut
