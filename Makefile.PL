@@ -5,8 +5,6 @@ WriteMakefile
   (
    'NAME'	=> 'Tk::ContextHelp',
    'VERSION_FROM' => 'ContextHelp.pm', # finds $VERSION
-   'dist'      => {'COMPRESS'=>'gzip -9f', 'SUFFIX' => '.gz',
-                   'POSTOP'=>'-$(CHMOD) 644 $(DISTVNAME).tar$(SUFFIX)'},
    'PM'         => 
    {'ContextHelp.pm'   => '$(INST_LIBDIR)/ContextHelp.pm',
     'context_help.xbm' => '$(INST_LIBDIR)/context_help.xbm',
