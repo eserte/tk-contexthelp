@@ -1,7 +1,7 @@
 # -*- perl -*-
 
 #
-# $Id: ContextHelp.pm,v 1.14 2000/09/13 22:27:05 eserte Exp $
+# $Id: ContextHelp.pm,v 1.15 2000/09/13 22:55:20 eserte Exp $
 # Author: Slaven Rezic
 #
 # Copyright (c) 1998,2000 Slaven Rezic. All rights reserved.
@@ -19,7 +19,7 @@ BEGIN { die "Tk::ContextHelp does not work with Win32" if $^O eq 'MSWin32' }
 use Tk::InputO;
 use strict;
 use vars qw($VERSION @ISA);
-$VERSION = '0.08';
+$VERSION = '0.09';
 @ISA = qw(Tk::Toplevel);
 
 Construct Tk::Widget 'ContextHelp';
@@ -391,12 +391,14 @@ sub HelpButton {
 			    $w->toggle;
 			};
     my $change_button_state = sub {
-	if ($w->{'state'} ne 'withdrawn' &&
-	    $w->{'state'} ne 'wait') {
-	    $w->{'oldrelief'} = $b->cget(-relief);
+	if ($w->{'state'} =~ /^(context|wait)$/) {
+	    if (!exists $w->{'oldrelief'}) {
+		$w->{'oldrelief'} = $b->cget(-relief);
+	    }
 	    $b->configure(-relief => 'sunken');
 	} else {
 	    $b->configure(-relief => $w->{'oldrelief'} || 'raised');
+	    delete $w->{'oldrelief'};
 	}
     };
     $w->configure(-callback => $change_button_state);
