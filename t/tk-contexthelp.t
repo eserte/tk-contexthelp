@@ -26,6 +26,8 @@ $ch = $top->ContextHelp(-widget => 'Message',
 			-width => 400, -justify => 'right',
 			-podfile => 'Tk::ContextHelp');
 
+#$ch->attach($top, -msg => 'No context help available for this topic');
+
 $tl = $top->Frame->grid(-row => 0, -column => 0);
 
 $b1 = $ch->HelpButton($tl)->pack;
@@ -37,6 +39,13 @@ $ch->attach($l1, -msg => 'This is the word "Hello"');
 
 $l2 = $tl->Label(-text => 'World')->pack;
 $ch->attach($l2, -msg => 'This is the word "World"');
+
+eval { require Tk::FireButton };
+if (!$@) {
+    $l3 = $tl->FireButton(-text => 'a fire button')->pack;
+    $ch->attach($l3, -msg => 'There seem to be problems with FireButtons
+not checking for an empty my_save_relief.');
+}
 
 $f  = $top->Frame(-relief => 'raised',
 		  -bg => 'red',
@@ -51,6 +60,7 @@ $fl1 = $f->Label(-text => 'a')->pack;
 $ch->attach($fl1, -command => sub {
 		my $t = $top->Toplevel;
 		$t->Label(-text => 'user-defined command')->pack;
+		$t->Popup(-popover => 'cursor');
 	    });
 
 $f->Label(-text => 'frame')->pack;
@@ -58,49 +68,37 @@ $f->Label(-text => 'frame')->pack;
 $f2 = $top->Frame(-relief => 'raised',
 		  -bd => 2)->grid(-row => 1, -column => 0);
 $f2->Label(-text => 'POD sections', -fg => 'red')->pack;
-$pod1 = $f2->Label(-text => 'Name')->pack;
-$pod2 = $f2->Label(-text => 'Synopsis')->pack;
-$pod3 = $f2->Label(-text => 'Description')->pack;
-$pod4 = $f2->Label(-text => 'Author')->pack;
-$pod5 = $f2->Label(-text => 'See also')->pack;
-$ch->attach($pod1, -pod => 'NAME');
-$ch->attach($pod2, -pod => 'SYNOPSIS');
-$ch->attach($pod3, -pod => 'DESCRIPTION');
-$ch->attach($pod4, -pod => 'AUTHOR');
-$ch->attach($pod5, -pod => 'SEE ALSO');
+$pod1 = $f2->Label(-text => 'Name')->pack(-anchor => 'w');
+$pod2 = $f2->Label(-text => 'Synopsis')->pack(-anchor => 'w');
+$pod3 = $f2->Label(-text => 'Description')->pack(-anchor => 'w');
+$pod30 = $f2->Label(-text => 'Methods')->pack(-anchor => 'w');
+$pod31 = $f2->Label(-text => '  attach')->pack(-anchor => 'w');
+$pod32 = $f2->Label(-text => '  detach')->pack(-anchor => 'w');
+$pod33 = $f2->Label(-text => '  activate')->pack(-anchor => 'w');
+$pod34 = $f2->Label(-text => '  deactivate')->pack(-anchor => 'w');
+$pod35 = $f2->Label(-text => '  HelpButton')->pack(-anchor => 'w');
+$pod4 = $f2->Label(-text => 'Author')->pack(-anchor => 'w');
+$pod5 = $f2->Label(-text => 'See also')->pack(-anchor => 'w');
+$ch->attach($pod1, -pod => '^NAME');
+$ch->attach($pod2, -pod => '^SYNOPSIS');
+$ch->attach($pod3, -pod => '^DESCRIPTION');
+$ch->attach($pod30, -pod => '^METHODS');
+$ch->attach($pod31, -pod => '^attach');
+$ch->attach($pod32, -pod => '^detach');
+$ch->attach($pod33, -pod => '^activate');
+$ch->attach($pod34, -pod => '^deactivate');
+$ch->attach($pod35, -pod => '^HelpButton');
+$ch->attach($pod4, -pod => '^AUTHOR');
+$ch->attach($pod5, -pod => '^SEE ALSO');
 
 $bn = $top->Button(-text => 'Tk::Pod pod',
 		   -command => sub { $ch->configure(-podfile => 'Tk::Pod') },
 		  )->grid(-row => 1, -column => 1);;
 $ch->attach($bn, -msg => "Changes the active pod to Tk::Pod's pod");
 
+$qb = $top->Button(-text => 'Quit',
+		   -command => sub { exit },
+		  )->grid(-row => 2, -columnspan => 2);
+$ch->attach($qb, -msg => "Click here if you are tired of this demo.");
+
 MainLoop;
-
-__END__
-
-# =head1 NAME
-
-# Tk::ContextHelp - context-sensitive help with perl/Tk
-
-# =head1 SYNOPSIS
-
-#   use Tk::ContextHelp;
-
-#   $ch = $top->ContextHelp;
-#   $ch->attach($widget, -msg => ...);
-
-#   $top->HelpButton->pack;
-
-# =head1 DESCRIPTION
-
-# XXX
-
-# =head1 AUTHOR
-
-# Slaven Rezic <eserte@cs.tu-berlin.de>
-
-# =head1 SEE ALSO
-
-# Tk::Balloon(3).
-
-# =cut
