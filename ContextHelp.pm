@@ -1,7 +1,7 @@
 # -*- perl -*-
 
 #
-# $Id: ContextHelp.pm,v 1.8 1998/03/03 23:13:35 eserte Exp $
+# $Id: ContextHelp.pm,v 1.9 1998/05/18 01:54:52 eserte Exp $
 # Author: Slaven Rezic
 #
 # Copyright (c) 1998 Slaven Rezic. All rights reserved.
@@ -13,10 +13,13 @@
 #
 
 package Tk::ContextHelp;
+
+BEGIN { die "Tk::ContextHelp does not work with Win32" if $^O eq 'MSWin32' }
+
 use Tk::InputO;
 use strict;
 use vars qw($VERSION @ISA);
-$VERSION = '0.04';
+$VERSION = '0.05';
 @ISA = qw(Tk::Toplevel);
 
 Construct Tk::Widget 'ContextHelp';
@@ -37,9 +40,10 @@ sub Populate {
     $w->{'inp_only_clients'} = [];
     $w->{'state'} = 'withdrawn';
 
-    my $key = delete $args->{'-helpkey'}; # XXX ConfigSpecs
+    my $key = delete $args->{'-helpkey'}; # XXX ConfigSpecs, specify Key?
     if (defined $key) {
-	$w->parent->toplevel->bind('<F1>' => sub { $w->_key_help });
+	$key = '<F1>' if $key !~ /^<.*>$/;
+	$w->parent->toplevel->bind($key => sub { $w->_key_help });
     }
 
     $w->{'inp_only'} = $w->parent->InputO(-cursor => 'watch');
@@ -72,6 +76,7 @@ sub Populate {
 # - context:   change the cursor and wait for clicks on widgets
 # - wait:      wait for the user to finish the help balloon
 # - cont:      similar like context, only if -stayactive is selected
+# - withdrawn: ?
 sub activate {
     my($w, $state) = @_;
     $state = 'context' unless $state;
@@ -202,7 +207,8 @@ sub _show_help {
 		}
 		if ($text) {
 		    $text->tag('configure', 'search',
-			       -background => 'red');
+			       -background => 'red',
+			       -foreground => 'black');
 		    $text->tag('remove', 'search', qw/0.0 end/);
 		    my $length = 0;
 		    # XXX exact or regex search?
@@ -491,8 +497,21 @@ clicks on the button over again.
 
 =head1 BUGS
 
+=over 4
+
+=item *
+
 The user cannot click on the border of an attached widget to raise the help
 window.
+
+=item *
+
+While in help mode, it is possible to click on buttons even if the
+buttons aren't attached to the help system. This is non-intuitive, but
+hard to fix. (Maybe a solution: create inputo-widgets for all
+not-attached widgets while in context mode)
+
+=back
 
 =head1 AUTHOR
 
