@@ -5,14 +5,13 @@ WriteMakefile
   (
    'NAME'	=> 'Tk::ContextHelp',
    'VERSION_FROM' => 'ContextHelp.pm', # finds $VERSION
-   'LIBS'	=> [''],   # e.g., '-lm' 
-   'DEFINE'	=> '',     # e.g., '-DHAVE_SOMETHING' 
+   'dist'      => {'COMPRESS'=>'gzip -9f', 'SUFFIX' => '.gz',
+                   'POSTOP'=>'-$(CHMOD) 644 $(DISTVNAME).tar$(SUFFIX)'},
    'PM'         => 
    {'ContextHelp.pm'   => '$(INST_LIBDIR)/ContextHelp.pm',
     'context_help.xbm' => '$(INST_LIBDIR)/context_help.xbm',
     'context_help_mask.xbm' => '$(INST_LIBDIR)/context_help_mask.xbm',
    },
-   'INC'	=> '',     # e.g., '-I/usr/include/other' 
    'PREREQ_PM'  => {'Tk'             => 402.002,
 		    'Tk::Pod'        => 0.4,
 		   },
