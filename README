@@ -11,8 +11,8 @@ To install, type
 
 	$ perl Makefile.PL
 	$ make
-	$ make install
 	$ make test
+	$ make install
 
 To start an sample script, type
 
