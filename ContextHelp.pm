@@ -1,7 +1,7 @@
 # -*- perl -*-
 
 #
-# $Id: ContextHelp.pm,v 1.3 1998/02/18 15:09:43 eserte Exp $
+# $Id: ContextHelp.pm,v 1.4 1998/02/19 17:29:06 eserte Exp $
 # Author: Slaven Rezic
 #
 # Copyright (C) 1998 Slaven Rezic. All rights reserved.
@@ -30,7 +30,6 @@ sub Populate {
     $w->bind('<Button-1>' => [ $w, 'deactivate']);
     $w->bind('<Button-2>' => [ $w, 'deactivate']);
     $w->bind('<Button-3>' => [ $w, 'deactivate']);
-    $w->bind('<Key>'      => [ $w, 'deactivate']); # XXX geht nicht?
 
     my $widget = delete $args->{'-widget'} || 'Label';
     $w->{'label'} = $w->$widget()->pack;
@@ -42,6 +41,7 @@ sub Populate {
        -font            => [$w->{'label'}, "font", "Font", "-*-helvetica-medium-r-normal--*-120-*-*-*-*-*-*"],
        -borderwidth     => ["SELF", "borderWidth", "BorderWidth", 1],
        -podfile         => ["METHOD", "podFile", "PodFile", $0],
+       -verbose         => ["PASSIVE", "verbose", "Verbose", 1],
        DEFAULT          => [$w->{'label'}],
       );
 }
@@ -54,7 +54,7 @@ sub activate {
     my $inp_only = $top->InputO
       (-width  => $top->width,
        -height => $top->height,
-      )->place(-x => 0, -y => 0, -relwidth => 1.0, -relheight => 1.0);
+      )->place('-x' => 0, '-y' => 0, -relwidth => 1.0, -relheight => 1.0);
     if ($state eq 'context') {
 	$inp_only->configure
 	  (-cursor => ['@' . Tk->findINC('context_help.xbm'),
@@ -66,7 +66,7 @@ sub activate {
     $inp_only->bind('<Button-1>' => [$w, '_active_state', $top, $inp_only]);
     $inp_only->bind('<Button-2>' => [$w, 'deactivate']);
     $inp_only->bind('<Button-3>' => [$w, 'deactivate']);
-    $inp_only->bind('<Key>'      => [$w, 'deactivate']); # XXX geht nicht?
+    $inp_only->bind('<Key>'      => [$w, 'deactivate']); # XXX InputO does not receive any Key events?!
 }
 
 sub _active_state {
@@ -78,37 +78,58 @@ sub _active_state {
 	my($rootx, $rooty) = ($x+$top->rootx,
 			      $y+$top->rooty);
 	my $under = $top->containing($rootx, $rooty);
+
+	my $raise_msg = sub {
+	    my $msg = shift;
+	    if ($w->cget(-installcolormap)) {
+		$w->colormapwindows($top);
+	    }
+	    $w->{'label'}->configure(-text => $msg);
+	    $w->geometry("+$rootx+$rooty");
+	    $w->deiconify;
+	    $w->raise;
+	    $w->update;
+	    $w->activate('wait');
+	};
+
 	# test underlying widget and its parents
 	while(defined $under) {
 	    if (exists $w->{'msg'}{$under}) {
-		if ($w->cget(-installcolormap)) {
-		    $w->colormapwindows($top);
-		}
-		$w->{'label'}->configure
-		  (-text => $w->{'msg'}{$under});
-		$w->geometry("+$rootx+$rooty");
-		$w->deiconify;
-		$w->raise;
-		$w->update;
-		$w->activate('wait');
+		$raise_msg->($w->{'msg'}{$under});
 		return;
 	    } elsif (exists $w->{'command'}{$under}) {
 		$w->{'command'}{$under}->($under);
 		$w->deactivate;
 		return;
 	    } elsif (exists $w->{'pod'}{$under}) {
+		my $podfile = $w->cget(-podfile);
 		if (Tk::Exists($w->{'podwindow'})) {
 		    $w->{'podwindow'}->deiconify;
 		    $w->{'podwindow'}->raise;
 		} else {
 		    eval { require Tk::Pod };
-		    if (!$@) {
-			$w->{'podwindow'} = $top->Pod(-file => $w->cget(-podfile));
+		    if ($@) {
+			$top->bell;
+			if ($w->cget(-verbose)) {
+			    $raise_msg->("Warning: Can't find Tk::Pod.\n$@");
+			    return;
+			}
+		    } else {
+			$top->Busy;
+			eval { $w->{'podwindow'} 
+			       = $top->Pod(-file => $podfile) };
+			$top->Unbusy;
+			if ($@) {
+			    undef $w->{'podwindow'};
+			    $top->bell;
+			    if ($w->cget(-verbose)) {
+				$raise_msg->("Warning: Can't find POD for <$podfile>.\n$@");
+				return;
+			    }
+			}
 		    }
 		}
-		if (!$w->{'podwindow'}) {
-		    $top->bell; # XXX message: can't find pod and/or Tk::Pod
-		} else {
+		if ($w->{'podwindow'}) {
 		    my $text;
 		    # here comes the *hack*
 		    # find the Text widget of the pod window
@@ -120,12 +141,13 @@ sub _active_state {
 			}
 		    }
 		    if ($text) {
-			# XXX exact or regex search?
 			$text->tag('configure', 'search',
 				   -background => 'red');
 			$text->tag('remove', 'search', qw/0.0 end/);
 			my $length = 0;
+			# XXX exact or regex search?
 			my $pos = $text->search(-count => \$length,
+						-regexp,
 						'--', $w->{'pod'}{$under},
 						'1.0', 'end');
 			if ($pos) {
@@ -134,7 +156,11 @@ sub _active_state {
 			    $text->see('end');
 			    $text->see($pos);
 			} else {
-			    $top->bell; # XXX message: can't find help topic
+			    $top->bell;
+			    if ($w->cget(-verbose)) {
+				$raise_msg->("Warning: Can't find help topic <$w->{'pod'}{$under}>.");
+				return;
+			    }
 			}
 		    }
 		}
@@ -143,7 +169,11 @@ sub _active_state {
 	    }
 	    $under = $under->parent;
 	}
-	$top->bell; # XXX pop help window with "no help available" up?
+	$top->bell;
+	if ($w->cget(-verbose)) {
+	    $raise_msg->("Warning: No help available for this topic.");
+	    return;
+	}
     }
     $w->deactivate;
 }
@@ -160,9 +190,14 @@ sub deactivate {
 
 sub attach {
     my($w, $client, %args) = @_;
-    $w->{'msg'}{$client}     = delete $args{-msg}     if exists $args{-msg};
-    $w->{'command'}{$client} = delete $args{-command} if exists $args{-command};
-    $w->{'pod'}{$client}     = delete $args{-pod}     if exists $args{-pod};
+    $w->detach($client);
+    if      (exists $args{-msg}) {
+	$w->{'msg'}{$client}     = delete $args{-msg};
+    } elsif (exists $args{-command}) {
+	$w->{'command'}{$client} = delete $args{-command};
+    } elsif (exists $args{-pod}) {
+	$w->{'pod'}{$client}     = delete $args{-pod};
+    }
     $client->OnDestroy([$w, 'detach', $client]);
 }
 
@@ -207,15 +242,92 @@ Tk::ContextHelp - context-sensitive help with perl/Tk
   $ch = $top->ContextHelp;
   $ch->attach($widget, -msg => ...);
 
-  $top->HelpButton->pack;
+  $ch->HelpButton($top)->pack;
 
 =head1 DESCRIPTION
 
-XXX
+B<ContextHelp> provides a context-sensitive help system. By activating
+the help system (either by clicking on a B<HelpButton> or calling the
+B<activate> method, the cursor changes to a left pointer with a
+question mark and the user may click on any widget in the window to
+get a help message or jump to the corresponding pod entry.
+
+B<ContextHelp> accepts all the options that the B<Label> widget
+accepts. In addition, the following options are also recognized.
+
+=over 4
+
+=item B<-podfile>
+
+Set the pod file for the B<-pod> argument of B<attach>. The default is
+C<$0> (the current script).
+
+=item B<-verbose>
+
+Be verbose if something goes wrong. Default is true.
+
+=item B<-widget>
+
+Use another widget instead of the default B<Label> for displaying
+messages. Another choice would be B<Message>.
+
+=back
+
+=head1 METHODS
+
+The B<ContextHelp> widget supports the following non-standard methods:
+
+=over 4
+
+=item B<attach(>I<widget>, I<options>B<)>
+
+Attaches the widget indicated by I<widget> to the context-sensitive
+help system. The options can be:
+
+=over 4
+
+=item B<-msg>
+
+The argument is the message to be shown in a popup window.
+
+=item B<-pod>
+
+The argument is a regular expression to jump in the corresponding pod file.
+
+=item B<-command>
+
+The argument is a user-defined command to be called when activating
+the help system on this widget.
+
+=back
+
+=item B<detach(>I<widget>B<)>
+
+Detaches the specified widget I<widget> from the help system.
+
+=item B<activate>
+
+Turn the help system on.
+
+=item B<deactivate>
+
+Turn the help system off.
+
+=item B<HelpButton(>I<top>, I<options>B<)>
+
+Create a help button. It is a regular B<Button> with I<-bitmap> set to
+the help cursor bitmap and I<-command> set to activation of the help
+system. The argument I<top> is the parent widget, I<options> are
+additional options for the help button.
+
+=back
 
 =head1 AUTHOR
 
 Slaven Rezic <eserte@cs.tu-berlin.de>
+
+Some code and documentation is derived from Rajappa Iyer's
+B<Tk::Balloon>.
 
 =head1 SEE ALSO
 
