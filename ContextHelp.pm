@@ -1,7 +1,7 @@
 # -*- perl -*-
 
 #
-# $Id: ContextHelp.pm,v 1.6 1998/02/26 22:48:11 eserte Exp $
+# $Id: ContextHelp.pm,v 1.7 1998/02/26 23:58:02 eserte Exp $
 # Author: Slaven Rezic
 #
 # Copyright (c) 1998 Slaven Rezic. All rights reserved.
@@ -27,7 +27,7 @@ sub Populate {
     
     $w->overrideredirect(1);
     $w->withdraw;
-    $w->bind('<Button-1>' => [ $w, 'deactivate']);
+    $w->bind('<Button-1>' => [ $w, '_next_action']);
     $w->bind('<Button-2>' => [ $w, 'deactivate']);
     $w->bind('<Button-3>' => [ $w, 'deactivate']);
     
@@ -36,6 +36,11 @@ sub Populate {
     $w->{'clients'} = [];
     $w->{'inp_only_clients'} = [];
     $w->{'state'} = 'withdrawn';
+
+    $w->{'inp_only'} = $w->parent->InputO(-cursor => 'watch');
+    $w->{'inp_only'}->bind('<Button-1>' => [ $w, '_next_action']);
+    $w->{'inp_only'}->bind('<Button-2>' => [ $w, 'deactivate']);
+    $w->{'inp_only'}->bind('<Button-3>' => [ $w, 'deactivate']);
     
     $w->ConfigSpecs
       (-installcolormap => ["PASSIVE", "installColormap", "InstallColormap", 0],
@@ -53,6 +58,7 @@ sub Populate {
 			     Tk->findINC('context_nohelp_mask.xbm'),
 			     'black', 'white']],
        -stayactive      => ["PASSIVE", "stayActive", "StayActive", 0],
+       -callback        => ["CALLBACK", "callback", "Callback", undef],
        DEFAULT          => [$w->{'label'}],
       );
 }
@@ -64,7 +70,7 @@ sub Populate {
 sub activate {
     my($w, $state) = @_;
     $state = 'context' unless $state;
-    $w->deactivate if $state eq 'context';
+    $w->_reset if $state eq 'context';
     $state = 'context' if $state eq 'cont';
     my $cw;
     foreach $cw (@{$w->{'inp_only_clients'}}) {
@@ -80,10 +86,13 @@ sub activate {
 	    $cw->raise;
 	}
     } elsif ($state eq 'wait') {
-	$w->_normal_cursor('wait');
+	$w->{'inp_only'}->place('-x' => 0, '-y' => 0,
+				-relwidth => 1.0, -relheight => 1.0);
+	$w->{'inp_only'}->raise;
     }
 
     $w->{'state'} = $state;
+    $w->cget(-callback)->($w) if $w->cget(-callback);
 }
 
 sub _active_state {
@@ -92,7 +101,7 @@ sub _active_state {
 	my $parent = $inp_only->parent;
 	my $e = $inp_only->XEvent;
 	my($x, $y) = ($e->x, $e->y);
-	$w->deactivate;
+	$w->_reset;
 	my($rootx, $rooty) = ($x+$parent->rootx,
 			      $y+$parent->rooty);
 	my $under = $parent->containing($rootx, $rooty);
@@ -117,7 +126,7 @@ sub _active_state {
 		return;
 	    } elsif (exists $w->{'command'}{$under}) {
 		$w->{'command'}{$under}->($under);
-		$w->deactivate;
+		$w->_next_action;
 		return;
 	    } elsif (exists $w->{'pod'}{$under} ||
 		     exists $w->{'podfile'}{$under}) {
@@ -183,11 +192,7 @@ sub _active_state {
 			}
 		    }
 		}
-		if ($w->cget(-stayactive)) {
-		    $w->activate('context');
-		} else {
-		    $w->deactivate;
-		}
+		$w->_next_action;
 		return;
 	    }
 	    $under = $under->parent;
@@ -201,13 +206,26 @@ sub _active_state {
     $w->deactivate;
 }
 
-sub _normal_cursor {
-    my($w, $wait) = @_;
-    if ($wait) {
-	$w->parent->configure(-cursor => 'watch');
+sub _next_action {
+    my($w) = @_;
+    if ($w->cget(-stayactive)) {
+	$w->activate('context');
     } else {
-	$w->parent->configure(-cursor => $w->{'save_cursor'});
+	$w->deactivate;
     }
+}
+
+sub _normal_cursor {
+    my($w) = @_;
+    $w->parent->configure(-cursor => $w->{'save_cursor'});
+}
+
+sub _reset {
+    my($w) = @_;
+    $w->withdraw;
+    $w->{'state'} = 'withdrawn';
+    $w->{'inp_only'}->placeForget;
+    $w->_normal_cursor;
     my $cw;
     foreach $cw (@{$w->{'inp_only_clients'}}) {
 	if (Tk::Exists($cw)) {
@@ -218,9 +236,8 @@ sub _normal_cursor {
 
 sub deactivate {
     my($w) = @_;
-    $w->withdraw;
-    $w->{'state'} = 'withdrawn';
-    $w->_normal_cursor;
+    $w->_reset;
+    $w->cget(-callback)->($w) if $w->cget(-callback);
 }
 
 sub toggle {
@@ -285,15 +302,24 @@ sub podfile {
     }
 }
 
-# XXX quasi-checkbutton, abhängig von state
 sub HelpButton {
     my($w, $top, %args) = @_;
+    my $b;
     $args{-bitmap} = '@' . Tk->findINC('context_help.xbm')
       unless $args{-bitmap};
     $args{-command} = sub { $w->configure(-stayactive => 0);
 			    $w->toggle;
 			};
-    my $b = $top->Button(%args); # XXX sunken, raised
+    my $change_button_state = sub {
+	if ($w->{'state'} ne 'withdrawn') {
+	    $b->configure(-relief => 'sunken');
+	} else {
+	    $b->configure(-relief => 'raised');
+	}
+    };
+    $w->configure(-callback => $change_button_state);
+
+    $b = $top->Button(%args);
     $b->bind('<Button-3>' => sub { $w->configure(-stayactive => 1);
 				   $w->toggle;
 			       });
@@ -329,10 +355,21 @@ accepts. In addition, the following options are also recognized.
 
 =over 4
 
+=item B<-callback>
+
+Set a callback to be called on each state change (useful for own
+HelpButton implementations).
+
 =item B<-cursor>
 
 Use another cursor for the help mode instead of the left pointer with
 question mark.
+
+=item B<-offcursor>
+
+Use another cursor for the help mode shown if the underlying widget is
+not attached to the help system. The default is a left pointer with a
+strike-through question mark.
 
 =item B<-podfile>
 
@@ -411,7 +448,17 @@ the help cursor bitmap and I<-command> set to activation of the help
 system. The argument I<top> is the parent widget, I<options> are
 additional options for the help button.
 
+The button stays pressed as the help is activated. Clicking on the
+pressed button causes the end of the help mode. Clicking with
+mousebutton-3 causes the help system to stay active until the user
+clicks on the button over again.
+
 =back
+
+=head1 BUGS
+
+The user cannot click on the border of an attached widget to raise the help
+window.
 
 =head1 AUTHOR
 
