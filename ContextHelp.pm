@@ -1,7 +1,7 @@
 # -*- perl -*-
 
 #
-# $Id: ContextHelp.pm,v 1.9 1998/05/18 01:54:52 eserte Exp $
+# $Id: ContextHelp.pm,v 1.10 1998/08/26 15:34:44 eserte Exp $
 # Author: Slaven Rezic
 #
 # Copyright (c) 1998 Slaven Rezic. All rights reserved.
@@ -85,7 +85,9 @@ sub activate {
     my $cw;
     foreach $cw (@{$w->{'inp_only_clients'}}) {
 	$cw->place('-x' => 0, '-y' => 0,
-		   -relwidth => 1.0, -relheight => 1.0);
+		   -relwidth => 1.0, -relheight => 1.0,
+		   -bordermode => 'outside',
+		  );
     }
     if ($state eq 'context') {
 	$w->{'save_cursor'} = $w->parent->cget(-cursor);
@@ -97,7 +99,9 @@ sub activate {
 	}
     } elsif ($state eq 'wait') {
 	$w->{'inp_only'}->place('-x' => 0, '-y' => 0,
-				-relwidth => 1.0, -relheight => 1.0);
+				-relwidth => 1.0, -relheight => 1.0,
+				-bordermode => 'outside',
+			       );
 	$w->{'inp_only'}->raise;
     }
 
@@ -169,6 +173,9 @@ sub _show_help {
 		 exists $w->{'podfile'}{$under}) {
 	    my $podfile = $w->{'podfile'}{$under} || $w->cget('-podfile');
 	    if (Tk::Exists($w->{'podwindow'})) {
+		if ($podfile ne $w->{'podwindow'}->cget(-file)) {
+		    $w->{'podwindow'}->configure(-file => $podfile);
+		}
 		$w->{'podwindow'}->deiconify;
 		$w->{'podwindow'}->raise;
 	    } else {
@@ -219,8 +226,8 @@ sub _show_help {
 		    if ($pos) {
 			$text->tag('add', 'search',
 				   $pos, "$pos + $length char");
-			$text->see('end');
-			$text->see($pos);
+			$text->yview("search.first");
+			$text->after(500, [$text, qw/tag remove search 0.0 end/]);
 		    } else {
 			$parent->bell;
 			if ($w->cget(-verbose)) {
@@ -501,8 +508,8 @@ clicks on the button over again.
 
 =item *
 
-The user cannot click on the border of an attached widget to raise the help
-window.
+The user cannot click on the border of an attached widget to raise the
+help window.
 
 =item *
 
@@ -510,6 +517,10 @@ While in help mode, it is possible to click on buttons even if the
 buttons aren't attached to the help system. This is non-intuitive, but
 hard to fix. (Maybe a solution: create inputo-widgets for all
 not-attached widgets while in context mode)
+
+=item *
+
+The balloon may exceed the screen.
 
 =back
 
