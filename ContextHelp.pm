@@ -1,7 +1,7 @@
 # -*- perl -*-
 
 #
-# $Id: ContextHelp.pm,v 1.10 1998/08/26 15:34:44 eserte Exp $
+# $Id: ContextHelp.pm,v 1.11 1999/03/13 03:38:08 eserte Exp $
 # Author: Slaven Rezic
 #
 # Copyright (c) 1998 Slaven Rezic. All rights reserved.
@@ -19,7 +19,7 @@ BEGIN { die "Tk::ContextHelp does not work with Win32" if $^O eq 'MSWin32' }
 use Tk::InputO;
 use strict;
 use vars qw($VERSION @ISA);
-$VERSION = '0.05';
+$VERSION = '0.06';
 @ISA = qw(Tk::Toplevel);
 
 Construct Tk::Widget 'ContextHelp';
@@ -106,7 +106,7 @@ sub activate {
     }
 
     $w->{'state'} = $state;
-    $w->cget(-callback)->($w) if $w->cget(-callback);
+    $w->cget(-callback)->Call($w) if $w->cget(-callback);
 }
 
 sub _active_state {
@@ -153,6 +153,10 @@ sub _show_help {
 	    $w->colormapwindows($parent);
 	}
 	$w->{'label'}->configure(-text => $msg);
+	$w->idletasks;
+	if ($w->reqwidth + $rootx > $w->screenwidth) {
+	    $rootx = $w->screenwidth - $w->reqwidth;
+	}
 	$w->geometry("+$rootx+$rooty");
 	$w->deiconify;
 	$w->raise;
@@ -181,59 +185,75 @@ sub _show_help {
 	    } else {
 		eval { require Tk::Pod };
 		if ($@) {
-		    $parent->bell;
-		    if ($w->cget(-verbose)) {
-			$raise_msg->("Warning: Can't find Tk::Pod.\n$@");
-			return;
-		    }
-		} else {
-		    $parent->Busy;
-		    eval { $w->{'podwindow'} 
-			   = $parent->toplevel->Pod(-file => $podfile) };
-		    $parent->Unbusy;
-		    if ($@) {
+		    my $t = $parent->toplevel->CHSimplePod
+		      (-title => "POD: $podfile",
+		       -file => $podfile);
+		    if (!defined $t->cget(-file)) {
+			$t->destroy;
 			undef $w->{'podwindow'};
 			$parent->bell;
 			if ($w->cget(-verbose)) {
-			    $raise_msg->("Warning: Can't find POD for <$podfile>.\n$@");
+			    $raise_msg->("Warning: Can't find POD for <$podfile>.\n");
+			    return;
+			}
+		    }
+		    $t->{'podfile'} = $podfile;
+		    $w->{'podwindow'} = $t;
+		} else {
+		    $parent->Busy;
+		    eval {
+			$w->{'podwindow'}
+			= $parent->toplevel->Pod(-file => $podfile);
+		    };
+		    my $err = $@;
+		    $parent->Unbusy;
+		    if ($err) {
+			undef $w->{'podwindow'};
+			$parent->bell;
+			if ($w->cget(-verbose)) {
+			    $raise_msg->("Warning: Can't find POD for <$podfile>.\n$err");
 			    return;
 			}
 		    }
 		}
 	    }
-	    if ($w->{'podwindow'} && $w->{'pod'}{$under}) {
-		my $text;
+
+	    my $textw;
+	    if ($w->{'podwindow'} &&
+		$w->{'podwindow'}->isa('Tk::ContextHelp::SimplePod')) {
+		$textw = $w->{'podwindow'}->Subwidget('text');
+	    } elsif ($w->{'podwindow'} && $w->{'pod'}{$under}) {
 		# here comes the *hack*
 		# find the Text widget of the pod window
 		foreach ($w->{'podwindow'}{'SubWidget'}{'pod'}
 			 ->children->{'SubWidget'}{'more'}->children) {
 		    if ($_->isa('Tk::Text')) {
-			$text = $_;
+			$textw = $_;
 			last;
 		    }
 		}
-		if ($text) {
-		    $text->tag('configure', 'search',
-			       -background => 'red',
-			       -foreground => 'black');
-		    $text->tag('remove', 'search', qw/0.0 end/);
-		    my $length = 0;
-		    # XXX exact or regex search?
-		    my $pos = $text->search(-count => \$length,
-					    -regexp,
-					    '--', $w->{'pod'}{$under},
-					    '1.0', 'end');
-		    if ($pos) {
-			$text->tag('add', 'search',
-				   $pos, "$pos + $length char");
-			$text->yview("search.first");
-			$text->after(500, [$text, qw/tag remove search 0.0 end/]);
-		    } else {
-			$parent->bell;
-			if ($w->cget(-verbose)) {
-			    $raise_msg->("Warning: Can't find help topic <$w->{'pod'}{$under}>.");
-			    return;
-			}
+	    }
+	    if ($textw) {
+		$textw->tag('configure', 'search',
+			    -background => 'red',
+			    -foreground => 'black');
+		$textw->tag('remove', 'search', qw/0.0 end/);
+		my $length = 0;
+		# XXX exact or regex search?
+		my $pos = $textw->search(-count => \$length,
+					 -regexp,
+					 '--', $w->{'pod'}{$under},
+					 '1.0', 'end');
+		if ($pos) {
+		    $textw->tag('add', 'search',
+				$pos, "$pos + $length char");
+		    $textw->yview("search.first");
+		    $textw->after(500, [$textw, qw/tag remove search 0.0 end/]);
+		} else {
+		    $parent->bell;
+		    if ($w->cget(-verbose)) {
+			$raise_msg->("Warning: Can't find help topic <$w->{'pod'}{$under}>.");
+			return;
 		    }
 		}
 	    }
@@ -280,7 +300,7 @@ sub _reset {
 sub deactivate {
     my($w) = @_;
     $w->_reset;
-    $w->cget(-callback)->($w) if $w->cget(-callback);
+    $w->cget(-callback)->Call($w) if $w->cget(-callback);
 }
 
 sub toggle {
@@ -369,6 +389,63 @@ sub HelpButton {
     $b;
 }
 
+package Tk::ContextHelp::SimplePod;
+use Tk::Toplevel;
+use strict;
+use vars qw(@ISA);
+@ISA = qw(Tk::Toplevel);
+
+Construct Tk::Widget 'CHSimplePod';
+
+sub Populate {
+    my($w, $args) = @_;
+    $w->SUPER::Populate(1);
+
+    require Tk::ROText;
+    my $t = $w->Scrolled('ROText',
+			 -scrollbars => 'osoe')->pack(-fill => 'both');
+    $w->Advertise('text' => $t);
+		  
+    $w->ConfigSpecs(-file => ["METHOD", "podfile", "Podfile", undef]);
+}
+
+sub file {
+    my $w = shift;
+    if (@_) {
+	my $file = shift;
+	$w->Busy;
+	eval {
+	    my $pid = open(POD, "-|");
+	    if (!$pid) {
+		# I think this is a bad idea when mixing
+		# perl versions:
+		#$ENV{PERL5LIB} = join(":", $ENV{PERL5LIB}, @INC);
+		exec 'perldoc', '-t', $file;
+		# Don't use die, but rather CORE::exit,
+		# which is safer.
+		warn "Can't execute perldoc";
+		CORE::exit(1);
+	    } else {
+		$w->Subwidget('text')->delete('1.0', 'end');
+		while(<POD>) {
+		    $w->Subwidget('text')->insert('end', $_);
+		}
+		close POD || die "perldoc exited with $?";
+	    }
+	};
+	my $err = $@;
+	$w->Unbusy;
+	if ($err) {
+	    warn $err;
+	    $w->{File} = undef;
+	} else {
+	    $w->{File} = $file;
+	}
+    } else {
+	$w->{File};
+    }
+}
+
 1;
 __END__
 
@@ -384,6 +461,9 @@ Tk::ContextHelp - context-sensitive help with perl/Tk
   $ch->attach($widget, -msg => ...);
 
   $ch->HelpButton($top)->pack;
+
+  $ch2 = $top->ContextHelp(-podfile => "perlfaq");
+  $ch2->attach($widget2, -pod => 'description');
 
 =head1 DESCRIPTION
 
@@ -517,10 +597,6 @@ While in help mode, it is possible to click on buttons even if the
 buttons aren't attached to the help system. This is non-intuitive, but
 hard to fix. (Maybe a solution: create inputo-widgets for all
 not-attached widgets while in context mode)
-
-=item *
-
-The balloon may exceed the screen.
 
 =back
 
