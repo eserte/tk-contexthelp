@@ -10,6 +10,7 @@ BEGIN { $| = 1; print "1..1\n"; }
 END {print "not ok 1\n" unless $loaded;}
 use Tk::ContextHelp;
 use Tk;
+$^W = 1;
 $loaded = 1;
 print "ok 1\n";
 
@@ -22,25 +23,84 @@ print "ok 1\n";
 $top = new MainWindow;
 #$ch = $top->ContextHelp;
 $ch = $top->ContextHelp(-widget => 'Message',
-			-width => 400, -justify => 'right');
+			-width => 400, -justify => 'right',
+			-podfile => 'Tk::ContextHelp');
 
-$l1 = $top->Label(-text => 'Hello')->pack;
-$ch->attach($l1, -msg => 'This is the word "Hello"');
+$tl = $top->Frame->grid(-row => 0, -column => 0);
 
-$l2 = $top->Label(-text => 'World')->pack;
-$ch->attach($l2, -msg => 'This is the word "World"');
-
-$f  = $top->Frame(-relief => 'raised',
-		  -bd => 2)->pack;
-$ch->attach($f, -msg => 'Frame test');
-
-$f->Label(-text => 'Labels')->pack;
-$f->Label(-text => 'in')->pack;
-$f->Label(-text => 'a')->pack;
-$f->Label(-text => 'frame')->pack;
-
-$b1 = $ch->HelpButton($top)->pack;
+$b1 = $ch->HelpButton($tl)->pack;
 $ch->attach($b1, -msg => 'Click here to turn the context help on. Then click
 on the desired widget in the window.');
 
+$l1 = $tl->Label(-text => 'Hello')->pack;
+$ch->attach($l1, -msg => 'This is the word "Hello"');
+
+$l2 = $tl->Label(-text => 'World')->pack;
+$ch->attach($l2, -msg => 'This is the word "World"');
+
+$f  = $top->Frame(-relief => 'raised',
+		  -bg => 'red',
+		  -bd => 2)->grid(-row => 0, -column => 1);
+$ch->attach($f, -msg => 'Frame test');
+
+$f->Label(-text => 'Labels')->pack;
+
+$f->Label(-text => 'in')->pack;
+
+$fl1 = $f->Label(-text => 'a')->pack;
+$ch->attach($fl1, -command => sub {
+		my $t = $top->Toplevel;
+		$t->Label(-text => 'user-defined command')->pack;
+	    });
+
+$f->Label(-text => 'frame')->pack;
+
+$f2 = $top->Frame(-relief => 'raised',
+		  -bd => 2)->grid(-row => 1, -column => 0);
+$f2->Label(-text => 'POD sections', -fg => 'red')->pack;
+$pod1 = $f2->Label(-text => 'Name')->pack;
+$pod2 = $f2->Label(-text => 'Synopsis')->pack;
+$pod3 = $f2->Label(-text => 'Description')->pack;
+$pod4 = $f2->Label(-text => 'Author')->pack;
+$pod5 = $f2->Label(-text => 'See also')->pack;
+$ch->attach($pod1, -pod => 'NAME');
+$ch->attach($pod2, -pod => 'SYNOPSIS');
+$ch->attach($pod3, -pod => 'DESCRIPTION');
+$ch->attach($pod4, -pod => 'AUTHOR');
+$ch->attach($pod5, -pod => 'SEE ALSO');
+
+$bn = $top->Button(-text => 'Tk::Pod pod',
+		   -command => sub { $ch->configure(-podfile => 'Tk::Pod') },
+		  )->grid(-row => 1, -column => 1);;
+$ch->attach($bn, -msg => "Changes the active pod to Tk::Pod's pod");
+
 MainLoop;
+
+__END__
+
+# =head1 NAME
+
+# Tk::ContextHelp - context-sensitive help with perl/Tk
+
+# =head1 SYNOPSIS
+
+#   use Tk::ContextHelp;
+
+#   $ch = $top->ContextHelp;
+#   $ch->attach($widget, -msg => ...);
+
+#   $top->HelpButton->pack;
+
+# =head1 DESCRIPTION
+
+# XXX
+
+# =head1 AUTHOR
+
+# Slaven Rezic <eserte@cs.tu-berlin.de>
+
+# =head1 SEE ALSO
+
+# Tk::Balloon(3).
+
+# =cut
