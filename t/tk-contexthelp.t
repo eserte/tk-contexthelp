@@ -6,11 +6,10 @@
 # Change 1..1 below to 1..last_test_to_print .
 # (It may become useful if the test is moved to ./t subdirectory.)
 
-BEGIN { $| = 1; print "1..1\n"; }
+BEGIN { $| = 1; $^W = 1; print "1..1\n"; }
 END {print "not ok 1\n" unless $loaded;}
 use Tk;
 use Tk::ContextHelp;
-$^W = 1;
 $loaded = 1;
 print "ok 1\n";
 
@@ -25,6 +24,7 @@ use lib ($FindBin::RealBin, "$FindBin::RealBin/..");
 
 $top = new MainWindow;
 #$ch = $top->ContextHelp;
+$top->bind('<Escape>' => sub { warn "This is the original binding for Esc\n"});
 $ch = $top->ContextHelp(-widget => 'Message',
 			-width => 400, -justify => 'right',
 			-podfile => 'Tk::ContextHelp',
@@ -36,9 +36,7 @@ $ch = $top->ContextHelp(-widget => 'Message',
 
 $tl = $top->Frame->grid(-row => 0, -column => 0);
 
-$b1 = $ch->HelpButton($tl)->pack;
-#$ch->attach($b1, -msg => 'Click here to turn the context help on. Then click
-#on the desired widget in the window.');
+$ch->HelpButton($tl)->pack;
 
 $l1 = $tl->Label(-text => 'Hello')->pack;
 $ch->attach($l1, -msg => 'This is the word "Hello"');
@@ -94,22 +92,27 @@ $ch->attach($pod1, -pod => '^NAME');
 $ch->attach($pod2, -pod => '^SYNOPSIS');
 $ch->attach($pod3, -pod => '^DESCRIPTION');
 $ch->attach($pod30, -pod => '^METHODS');
-$ch->attach($pod31, -pod => '^attach');
-$ch->attach($pod32, -pod => '^detach');
-$ch->attach($pod33, -pod => '^activate');
-$ch->attach($pod34, -pod => '^deactivate');
-$ch->attach($pod35, -pod => '^HelpButton');
+$ch->attach($pod31, -pod => '^\s*attach');
+$ch->attach($pod32, -pod => '^\s*detach');
+$ch->attach($pod33, -pod => '^\s*activate');
+$ch->attach($pod34, -pod => '^\s*deactivate');
+$ch->attach($pod35, -pod => '^\s*HelpButton');
 $ch->attach($pod4, -pod => '^AUTHOR');
 $ch->attach($pod5, -pod => '^SEE ALSO');
 
 $bn = $top->Button(-text => 'Tk::Pod pod',
 		   -command => sub { $ch->configure(-podfile => 'Tk::Pod') },
-		  )->grid(-row => 1, -column => 1);;
+		  )->grid(-row => 1, -column => 1);
 $ch->attach($bn, -msg => "Changes the active pod to Tk::Pod's pod");
+
+my $entrytest = "Test...";
+$te = $top->Entry(-textvariable => \$entrytest)->grid(-row => 2,
+						      -columnspan => 2);
+$ch->attach($te, -msg => "Type something in");
 
 $qb = $top->Button(-text => 'Quit',
 		   -command => sub { exit },
-		  )->grid(-row => 2, -columnspan => 2);
+		  )->grid(-row => 3, -columnspan => 2);
 $ch->attach($qb, -msg => "Click here if you are tired of this demo.");
 
 ######################################################################
@@ -119,11 +122,11 @@ $icon_frame = $top2->Frame(-relief => 'ridge',
 			   -bd => 2)->pack(-fill => 'x', -expand => 1);
 $main_frame = $top2->Frame->pack(-fill => 'both', -expand => 1);
 $ch2 = $main_frame->ContextHelp(-podfile => 'Tk::ContextHelp');
-$hb2 = $icon_frame->Button(-text => 'click here',
-			   -command => [$ch2, 'activate'],
-			  )->pack(-side => 'right');
+$icon_frame->Button(-text => 'click here',
+		    -command => [$ch2, 'activate'],
+		   )->pack(-side => 'right');
 $stay_active = 0;
-$cb2 = $icon_frame->Checkbutton
+$icon_frame->Checkbutton
   (-text => 'stay active',
    -variable => \$stay_active,
    -command => sub { $ch2->configure(-stayactive => $stay_active) },
@@ -156,13 +159,19 @@ $ch2->attach($pod1, -pod => '^NAME');
 $ch2->attach($pod2, -pod => '^SYNOPSIS');
 $ch2->attach($pod3, -pod => '^DESCRIPTION');
 $ch2->attach($pod30, -pod => '^METHODS');
-$ch2->attach($pod31, -pod => '^attach');
-$ch2->attach($pod32, -pod => '^detach');
-$ch2->attach($pod33, -pod => '^activate');
-$ch2->attach($pod34, -pod => '^deactivate');
-$ch2->attach($pod35, -pod => '^HelpButton');
+$ch2->attach($pod31, -pod => '^\s*attach');
+$ch2->attach($pod32, -pod => '^\s*detach');
+$ch2->attach($pod33, -pod => '^\s*activate');
+$ch2->attach($pod34, -pod => '^\s*deactivate');
+$ch2->attach($pod35, -pod => '^\s*HelpButton');
 $ch2->attach($pod4, -pod => '^AUTHOR');
 $ch2->attach($pod5, -pod => '^SEE ALSO');
 
 
+if ($ENV{BATCH}) {
+    $top->after(500, sub {
+		    $top->destroy;
+		    $top2->destroy;
+		});
+}
 MainLoop;
