@@ -7,3 +7,4 @@ context_nohelp_mask.xbm
 MANIFEST
 Makefile.PL
 test.pl
+README
