@@ -31,8 +31,8 @@ $ch = $top->ContextHelp(-widget => 'Message',
 $tl = $top->Frame->grid(-row => 0, -column => 0);
 
 $b1 = $ch->HelpButton($tl)->pack;
-$ch->attach($b1, -msg => 'Click here to turn the context help on. Then click
-on the desired widget in the window.');
+#$ch->attach($b1, -msg => 'Click here to turn the context help on. Then click
+#on the desired widget in the window.');
 
 $l1 = $tl->Label(-text => 'Hello')->pack;
 $ch->attach($l1, -msg => 'This is the word "Hello"');
