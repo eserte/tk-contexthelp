@@ -1,7 +1,7 @@
 # -*- perl -*-
 
 #
-# $Id: ContextHelp.pm,v 1.12 1999/08/14 21:44:12 eserte Exp $
+# $Id: ContextHelp.pm,v 1.13 1999/08/14 22:13:41 eserte Exp $
 # Author: Slaven Rezic
 #
 # Copyright (c) 1998 Slaven Rezic. All rights reserved.
@@ -19,7 +19,7 @@ BEGIN { die "Tk::ContextHelp does not work with Win32" if $^O eq 'MSWin32' }
 use Tk::InputO;
 use strict;
 use vars qw($VERSION @ISA);
-$VERSION = '0.06';
+$VERSION = '0.07';
 @ISA = qw(Tk::Toplevel);
 
 Construct Tk::Widget 'ContextHelp';
@@ -46,9 +46,12 @@ sub Populate {
     $w->{'inp_only'}->bind('<Button-3>' => [ $w, 'deactivate']);
     
     $w->ConfigSpecs
-      (-installcolormap => ["PASSIVE", "installColormap", "InstallColormap", 0],
-       -background      => [$w->{'label'}, "background", "Background", "#C0C080"],
-       -font            => [$w->{'label'}, "font", "Font", "-*-helvetica-medium-r-normal--*-120-*-*-*-*-*-*"],
+      (-installcolormap => ["PASSIVE", "installColormap", "InstallColormap",
+			    0],
+       -background      => [$w->{'label'}, "background", "Background",
+			    "#C0C080"],
+       -font            => [$w->{'label'}, "font", "Font",
+			    "-*-helvetica-medium-r-normal--*-120-*-*-*-*-*-*"],
        -borderwidth     => ["SELF", "borderWidth", "BorderWidth", 1],
        '-podfile'       => ["METHOD", "podFile", "PodFile", $0],
        -verbose         => ["PASSIVE", "verbose", "Verbose", 1],
@@ -182,6 +185,7 @@ sub _show_help {
 	    } else {
 		eval { require Tk::Pod };
 		if ($@) {
+		    # use SimplePod as fallback for Tk::Pod
 		    my $t = $parent->toplevel->CHSimplePod
 		      (-title => "POD: $podfile",
 		       -file => $podfile);
@@ -197,13 +201,14 @@ sub _show_help {
 		    $t->{'podfile'} = $podfile;
 		    $w->{'podwindow'} = $t;
 		} else {
-		    $parent->Busy;
+		    # use original Tk::Pod
+		    _busy($parent);
 		    eval {
 			$w->{'podwindow'}
 			= $parent->toplevel->Pod(-file => $podfile);
 		    };
 		    my $err = $@;
-		    $parent->Unbusy;
+		    _unbusy($parent);
 		    if ($err) {
 			undef $w->{'podwindow'};
 			$parent->bell;
@@ -401,6 +406,25 @@ sub HelpButton {
     $b;
 }
 
+# XXX Problems with -recurse and SimplePod => disabling for now
+sub _busy {
+    my $w = shift;
+    if (1 || $Tk::VERSION < 800.012) {
+	$w->Busy;
+    } else {
+	$w->Busy(-recurse => 1);
+    }
+}
+
+sub _unbusy {
+    my $w = shift;
+    if (1 || $Tk::VERSION < 800.012) {
+	$w->Unbusy;
+    } else {
+	$w->Unbusy(-recurse => 1);
+    }
+}
+
 package Tk::ContextHelp::SimplePod;
 use Tk::Toplevel;
 use strict;
@@ -425,14 +449,24 @@ sub file {
     my $w = shift;
     if (@_) {
 	my $file = shift;
-	$w->parent->toplevel->Busy;
+	Tk::ContextHelp::_busy($w->parent->toplevel);
 	eval {
 	    my $pid = open(POD, "-|");
 	    if (!$pid) {
-		# I think this is a bad idea when mixing
-		# perl versions:
-		#$ENV{PERL5LIB} = join(":", $ENV{PERL5LIB}, @INC);
 		local($^W) = 0;
+		{
+		    # I think it's a bad idea when mixing
+		    # perl versions, so make this local for just this
+		    # call of perldoc, which has the same version as the
+		    # calling program
+		    local $ENV{PERL5LIB} = join(":", $ENV{PERL5LIB}, @INC);
+		    require Config;
+		    my $perldocpath = "$Config::Config{installscript}/perldoc";
+		    if (-x $perldocpath) {
+			exec $^X, $perldocpath, '-t', $file;
+			# Can't execute ... try next one
+		    }
+		}
 		exec 'perldoc', '-t', $file;
 		# Don't use die, but rather CORE::exit,
 		# which is safer.
@@ -447,7 +481,7 @@ sub file {
 	    }
 	};
 	my $err = $@;
-	$w->parent->toplevel->Unbusy;
+	Tk::ContextHelp::_unbusy($w->parent->toplevel);
 	if ($err) {
 	    warn $err;
 	    $w->{File} = undef;
