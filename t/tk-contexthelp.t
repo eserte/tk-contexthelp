@@ -20,12 +20,27 @@ print "ok 1\n";
 # of the test code):
 
 $top = new MainWindow;
-$ch = $top->ContextHelp;
+#$ch = $top->ContextHelp;
+$ch = $top->ContextHelp(-widget => 'Message',
+			-width => 400, -justify => 'right');
+
 $l1 = $top->Label(-text => 'Hello')->pack;
 $ch->attach($l1, -msg => 'This is the word "Hello"');
+
 $l2 = $top->Label(-text => 'World')->pack;
 $ch->attach($l2, -msg => 'This is the word "World"');
-$b1 = $ch->CHButton($top)->pack;
-$ch->attach($b1, -msg => 'Turn context help on');
+
+$f  = $top->Frame(-relief => 'raised',
+		  -bd => 2)->pack;
+$ch->attach($f, -msg => 'Frame test');
+
+$f->Label(-text => 'Labels')->pack;
+$f->Label(-text => 'in')->pack;
+$f->Label(-text => 'a')->pack;
+$f->Label(-text => 'frame')->pack;
+
+$b1 = $ch->HelpButton($top)->pack;
+$ch->attach($b1, -msg => 'Click here to turn the context help on. Then click
+on the desired widget in the window.');
 
 MainLoop;
