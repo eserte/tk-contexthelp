@@ -1,5 +1,8 @@
 Revision history for Perl extension Tk::ContextHelp.
 
+0.08
+	- save original HelpButton relief
+
 0.07
 	- Escape works now as expected
 	- new -helpkey option
