@@ -1,7 +1,7 @@
 # -*- perl -*-
 
 #
-# $Id: ContextHelp.pm,v 1.5 1998/02/20 21:54:25 eserte Exp $
+# $Id: ContextHelp.pm,v 1.6 1998/02/26 22:48:11 eserte Exp $
 # Author: Slaven Rezic
 #
 # Copyright (c) 1998 Slaven Rezic. All rights reserved.
@@ -16,7 +16,7 @@ package Tk::ContextHelp;
 use Tk::InputO;
 use strict;
 use vars qw($VERSION @ISA);
-$VERSION = '0.02';
+$VERSION = '0.03';
 @ISA = qw(Tk::Toplevel);
 
 Construct Tk::Widget 'ContextHelp';
@@ -24,24 +24,34 @@ Construct Tk::Widget 'ContextHelp';
 sub Populate {
     my($w, $args) = @_;
     $w->SUPER::Populate($args);
-
+    
     $w->overrideredirect(1);
     $w->withdraw;
     $w->bind('<Button-1>' => [ $w, 'deactivate']);
     $w->bind('<Button-2>' => [ $w, 'deactivate']);
     $w->bind('<Button-3>' => [ $w, 'deactivate']);
-
+    
     my $widget = delete $args->{'-widget'} || 'Label';
     $w->{'label'} = $w->$widget()->pack;
+    $w->{'clients'} = [];
+    $w->{'inp_only_clients'} = [];
     $w->{'state'} = 'withdrawn';
-
+    
     $w->ConfigSpecs
       (-installcolormap => ["PASSIVE", "installColormap", "InstallColormap", 0],
        -background      => [$w->{'label'}, "background", "Background", "#C0C080"],
        -font            => [$w->{'label'}, "font", "Font", "-*-helvetica-medium-r-normal--*-120-*-*-*-*-*-*"],
        -borderwidth     => ["SELF", "borderWidth", "BorderWidth", 1],
-       -podfile         => ["METHOD", "podFile", "PodFile", $0],
+       '-podfile'       => ["METHOD", "podFile", "PodFile", $0],
        -verbose         => ["PASSIVE", "verbose", "Verbose", 1],
+       -cursor          => ["PASSIVE", "cursor", "Cursor",
+			    ['@' . Tk->findINC('context_help.xbm'),
+			     Tk->findINC('context_help_mask.xbm'),
+			     'black', 'white']],
+       -offcursor       => ["PASSIVE", "offCursor", "offCursor",
+			    ['@' . Tk->findINC('context_nohelp.xbm'),
+			     Tk->findINC('context_nohelp_mask.xbm'),
+			     'black', 'white']],
        -stayactive      => ["PASSIVE", "stayActive", "StayActive", 0],
        DEFAULT          => [$w->{'label'}],
       );
@@ -54,41 +64,43 @@ sub Populate {
 sub activate {
     my($w, $state) = @_;
     $state = 'context' unless $state;
-    $w->deactivate unless $state eq 'wait' || $state eq 'cont';
+    $w->deactivate if $state eq 'context';
     $state = 'context' if $state eq 'cont';
-    my $top = $w->parent; #->toplevel;
-    my $inp_only = $top->InputO
-      (-width  => $top->width,
-       -height => $top->height,
-      )->place('-x' => 0, '-y' => 0, -relwidth => 1.0, -relheight => 1.0);
-    if ($state eq 'context') {
-	$inp_only->configure
-	  (-cursor => ['@' . Tk->findINC('context_help.xbm'),
-		       Tk->findINC('context_help_mask.xbm'),
-		       'black', 'white']);
+    my $cw;
+    foreach $cw (@{$w->{'inp_only_clients'}}) {
+	$cw->place('-x' => 0, '-y' => 0,
+		   -relwidth => 1.0, -relheight => 1.0);
     }
-    $w->{'inp_only'} = $inp_only;
+    if ($state eq 'context') {
+	$w->{'save_cursor'} = $w->parent->cget(-cursor);
+	$w->parent->configure(-cursor => $w->cget(-offcursor));
+	my $cursor = $w->cget(-cursor);
+	foreach $cw (@{$w->{'inp_only_clients'}}) {
+	    $cw->configure(-cursor => $cursor);
+	    $cw->raise;
+	}
+    } elsif ($state eq 'wait') {
+	$w->_normal_cursor('wait');
+    }
+
     $w->{'state'} = $state;
-    $inp_only->bind('<Button-1>' => [$w, '_active_state', $top, $inp_only]);
-    $inp_only->bind('<Button-2>' => [$w, 'deactivate']);
-    $inp_only->bind('<Button-3>' => [$w, 'deactivate']);
-    $inp_only->bind('<Key>'      => [$w, 'deactivate']); # XXX InputO does not receive any Key events?!
 }
 
 sub _active_state {
-    my($w, $top, $inp_only) = @_;
+    my($w, $inp_only) = @_;
     if ($w->{'state'} eq 'context') {
+	my $parent = $inp_only->parent;
 	my $e = $inp_only->XEvent;
 	my($x, $y) = ($e->x, $e->y);
 	$w->deactivate;
-	my($rootx, $rooty) = ($x+$top->rootx,
-			      $y+$top->rooty);
-	my $under = $top->containing($rootx, $rooty);
-
+	my($rootx, $rooty) = ($x+$parent->rootx,
+			      $y+$parent->rooty);
+	my $under = $parent->containing($rootx, $rooty);
+	
 	my $raise_msg = sub {
 	    my $msg = shift;
 	    if ($w->cget(-installcolormap)) {
-		$w->colormapwindows($top);
+		$w->colormapwindows($parent);
 	    }
 	    $w->{'label'}->configure(-text => $msg);
 	    $w->geometry("+$rootx+$rooty");
@@ -97,7 +109,7 @@ sub _active_state {
 	    $w->update;
 	    $w->activate($w->cget(-stayactive) ? 'cont' : 'wait');
 	};
-
+	
 	# test underlying widget and its parents
 	while(defined $under) {
 	    if (exists $w->{'msg'}{$under}) {
@@ -107,27 +119,28 @@ sub _active_state {
 		$w->{'command'}{$under}->($under);
 		$w->deactivate;
 		return;
-	    } elsif (exists $w->{'pod'}{$under}) {
-		my $podfile = $w->cget(-podfile);
+	    } elsif (exists $w->{'pod'}{$under} ||
+		     exists $w->{'podfile'}{$under}) {
+		my $podfile = $w->{'podfile'}{$under} || $w->cget('-podfile');
 		if (Tk::Exists($w->{'podwindow'})) {
 		    $w->{'podwindow'}->deiconify;
 		    $w->{'podwindow'}->raise;
 		} else {
 		    eval { require Tk::Pod };
 		    if ($@) {
-			$top->bell;
+			$parent->bell;
 			if ($w->cget(-verbose)) {
 			    $raise_msg->("Warning: Can't find Tk::Pod.\n$@");
 			    return;
 			}
 		    } else {
-			$top->Busy;
+			$parent->Busy;
 			eval { $w->{'podwindow'} 
-			       = $top->Pod(-file => $podfile) };
-			$top->Unbusy;
+			       = $parent->toplevel->Pod(-file => $podfile) };
+			$parent->Unbusy;
 			if ($@) {
 			    undef $w->{'podwindow'};
-			    $top->bell;
+			    $parent->bell;
 			    if ($w->cget(-verbose)) {
 				$raise_msg->("Warning: Can't find POD for <$podfile>.\n$@");
 				return;
@@ -135,7 +148,7 @@ sub _active_state {
 			}
 		    }
 		}
-		if ($w->{'podwindow'}) {
+		if ($w->{'podwindow'} && $w->{'pod'}{$under}) {
 		    my $text;
 		    # here comes the *hack*
 		    # find the Text widget of the pod window
@@ -162,7 +175,7 @@ sub _active_state {
 			    $text->see('end');
 			    $text->see($pos);
 			} else {
-			    $top->bell;
+			    $parent->bell;
 			    if ($w->cget(-verbose)) {
 				$raise_msg->("Warning: Can't find help topic <$w->{'pod'}{$under}>.");
 				return;
@@ -179,7 +192,7 @@ sub _active_state {
 	    }
 	    $under = $under->parent;
 	}
-	$top->bell;
+	$parent->bell;
 	if ($w->cget(-verbose)) {
 	    $raise_msg->("Warning: No help available for this topic.");
 	    return;
@@ -188,13 +201,34 @@ sub _active_state {
     $w->deactivate;
 }
 
+sub _normal_cursor {
+    my($w, $wait) = @_;
+    if ($wait) {
+	$w->parent->configure(-cursor => 'watch');
+    } else {
+	$w->parent->configure(-cursor => $w->{'save_cursor'});
+    }
+    my $cw;
+    foreach $cw (@{$w->{'inp_only_clients'}}) {
+	if (Tk::Exists($cw)) {
+	    $cw->placeForget;
+	}
+    }
+}
+
 sub deactivate {
     my($w) = @_;
     $w->withdraw;
     $w->{'state'} = 'withdrawn';
-    if (Tk::Exists($w->{'inp_only'})) {
-	$w->{'inp_only'}->destroy;
-	delete $w->{'inp_only'};
+    $w->_normal_cursor;
+}
+
+sub toggle {
+    my $w = shift;
+    if ($w->{'state'} eq 'withdrawn') {
+	$w->activate;
+    } else {
+	$w->deactivate;
     }
 }
 
@@ -208,6 +242,19 @@ sub attach {
     } elsif (exists $args{-pod}) {
 	$w->{'pod'}{$client}     = delete $args{-pod};
     }
+    if (exists $args{'-podfile'}) {
+	$w->{'podfile'}{$client}     = delete $args{'-podfile'};
+    }
+    push(@{$w->{'clients'}}, $client);
+    my $inputo = $client->InputO(-width  => $client->width,
+				 -height => $client->height,
+				);
+    push(@{$w->{'inp_only_clients'}}, $inputo);
+    $inputo->bind('<Button-1>' => [$w, '_active_state', $inputo]);
+    $inputo->bind('<Button-2>' => [$w, 'deactivate']);
+    $inputo->bind('<Button-3>' => [$w, 'deactivate']);
+    #$inputo->bind('<Escape>'   => [$w, 'deactivate']);
+    #$inputo->bind('<Key>'      => [$w, 'deactivate']); # XXX InputO does not receive any Key events?!
     $client->OnDestroy([$w, 'detach', $client]);
 }
 
@@ -216,6 +263,14 @@ sub detach {
     delete $w->{'msg'}{$client};
     delete $w->{'command'}{$client};
     delete $w->{'pod'}{$client};
+    my $i;
+    for($i = 0; $i <= $#{$w->{'clients'}}; $i++) {
+	if ($client eq $w->{'clients'}[$i]) {
+	    splice @{$w->{'clients'}}, $i, 1;
+	    splice @{$w->{'inp_only_clients'}}, $i, 1;
+	    last;
+	}
+    }
 }
 
 sub podfile {
@@ -230,12 +285,19 @@ sub podfile {
     }
 }
 
+# XXX quasi-checkbutton, abhängig von state
 sub HelpButton {
     my($w, $top, %args) = @_;
     $args{-bitmap} = '@' . Tk->findINC('context_help.xbm')
       unless $args{-bitmap};
-    $args{-command} = [$w, 'activate'];
-    my $b = $top->Button(%args);
+    $args{-command} = sub { $w->configure(-stayactive => 0);
+			    $w->toggle;
+			};
+    my $b = $top->Button(%args); # XXX sunken, raised
+    $b->bind('<Button-3>' => sub { $w->configure(-stayactive => 1);
+				   $w->toggle;
+			       });
+    $b;
 }
 
 1;
@@ -267,10 +329,20 @@ accepts. In addition, the following options are also recognized.
 
 =over 4
 
+=item B<-cursor>
+
+Use another cursor for the help mode instead of the left pointer with
+question mark.
+
 =item B<-podfile>
 
 Set the pod file for the B<-pod> argument of B<attach>. The default is
 C<$0> (the current script).
+
+=item B<-stayactive>
+
+If set to true, help mode is active until set to false. So the user
+may browse over all topics he like.
 
 =item B<-verbose>
 
@@ -279,7 +351,7 @@ Be verbose if something goes wrong. Default is true.
 =item B<-widget>
 
 Use another widget instead of the default B<Label> for displaying
-messages. Another choice would be B<Message>.
+messages. Another possible choice would be B<Message>.
 
 =back
 
@@ -289,10 +361,10 @@ The B<ContextHelp> widget supports the following non-standard methods:
 
 =over 4
 
-=item B<attach(>I<widget>, I<options>B<)>
+=item B<attach(>I<widget>, I<option>B<)>
 
 Attaches the widget indicated by I<widget> to the context-sensitive
-help system. The options can be:
+help system. Option may be one of the following:
 
 =over 4
 
@@ -303,6 +375,11 @@ The argument is the message to be shown in a popup window.
 =item B<-pod>
 
 The argument is a regular expression to jump in the corresponding pod file.
+
+=item B<-podfile>
+
+The argument is a pod name to be used instead of the default pod file.
+B<-podfile> may be used together with B<-pod> or all alone.
 
 =item B<-command>
 
@@ -322,6 +399,10 @@ Turn the help system on.
 =item B<deactivate>
 
 Turn the help system off.
+
+=item B<toggle>
+
+Toggle help system on or off.
 
 =item B<HelpButton(>I<top>, I<options>B<)>
 
