@@ -1,10 +1,10 @@
 # -*- perl -*-
 
 #
-# $Id: ContextHelp.pm,v 1.13 1999/08/14 22:13:41 eserte Exp $
+# $Id: ContextHelp.pm,v 1.14 2000/09/13 22:27:05 eserte Exp $
 # Author: Slaven Rezic
 #
-# Copyright (c) 1998 Slaven Rezic. All rights reserved.
+# Copyright (c) 1998,2000 Slaven Rezic. All rights reserved.
 # This package is free software; you can redistribute it and/or
 # modify it under the same terms as Perl itself.
 #
@@ -19,7 +19,7 @@ BEGIN { die "Tk::ContextHelp does not work with Win32" if $^O eq 'MSWin32' }
 use Tk::InputO;
 use strict;
 use vars qw($VERSION @ISA);
-$VERSION = '0.07';
+$VERSION = '0.08';
 @ISA = qw(Tk::Toplevel);
 
 Construct Tk::Widget 'ContextHelp';
@@ -27,13 +27,13 @@ Construct Tk::Widget 'ContextHelp';
 sub Populate {
     my($w, $args) = @_;
     $w->SUPER::Populate($args);
-    
+
     $w->overrideredirect(1);
     $w->withdraw;
     $w->bind('<Button-1>' => [ $w, '_next_action']);
     $w->bind('<Button-2>' => [ $w, 'deactivate']);
     $w->bind('<Button-3>' => [ $w, 'deactivate']);
-    
+
     my $widget = delete $args->{'-widget'} || 'Label';
     $w->{'label'} = $w->$widget()->pack;
     $w->{'clients'} = [];
@@ -44,7 +44,7 @@ sub Populate {
     $w->{'inp_only'}->bind('<Button-1>' => [ $w, '_next_action']);
     $w->{'inp_only'}->bind('<Button-2>' => [ $w, 'deactivate']);
     $w->{'inp_only'}->bind('<Button-3>' => [ $w, 'deactivate']);
-    
+
     $w->ConfigSpecs
       (-installcolormap => ["PASSIVE", "installColormap", "InstallColormap",
 			    0],
@@ -163,7 +163,7 @@ sub _show_help {
 	$w->update;
 	$w->activate($w->cget(-stayactive) ? 'cont' : 'wait');
     };
-	
+
     # test underlying widget and its parents
     while(defined $under) {
 	if (exists $w->{'msg'}{$under}) {
@@ -391,10 +391,12 @@ sub HelpButton {
 			    $w->toggle;
 			};
     my $change_button_state = sub {
-	if ($w->{'state'} ne 'withdrawn') {
+	if ($w->{'state'} ne 'withdrawn' &&
+	    $w->{'state'} ne 'wait') {
+	    $w->{'oldrelief'} = $b->cget(-relief);
 	    $b->configure(-relief => 'sunken');
 	} else {
-	    $b->configure(-relief => 'raised');
+	    $b->configure(-relief => $w->{'oldrelief'} || 'raised');
 	}
     };
     $w->configure(-callback => $change_button_state);
@@ -441,7 +443,7 @@ sub Populate {
     my $t = $w->Scrolled('ROText',
 			 -scrollbars => 'osoe')->pack(-fill => 'both');
     $w->Advertise('text' => $t);
-		  
+
     $w->ConfigSpecs(-file => ["METHOD", "podfile", "Podfile", undef]);
 }
 
@@ -665,7 +667,7 @@ Slaven Rezic <F<eserte@cs.tu-berlin.de>>
 Some code and documentation is derived from Rajappa Iyer's
 B<Tk::Balloon>.
 
-Copyright (c) 1998 Slaven Rezic. All rights reserved.
+Copyright (c) 1998,2000 Slaven Rezic. All rights reserved.
 This package is free software; you can redistribute it and/or
 modify it under the same terms as Perl itself.
 
