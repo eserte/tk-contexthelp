@@ -9,7 +9,7 @@
 use vars qw($loaded);
 use strict;
 
-BEGIN { $| = 1; $^W = 1; print "1..1\n"; }
+BEGIN { $| = 1; $^W = 1; print "1..2\n"; }
 END {print "not ok 1\n" unless $loaded;}
 use Tk;
 use Tk::ContextHelp;
@@ -29,7 +29,7 @@ use lib ($FindBin::RealBin, "$FindBin::RealBin/..");
 my $top = new MainWindow;
 $top->bind('<Escape>' => sub { warn "This is the original binding for Esc\n"});
 
-$top->optionAdd("*LabFrame*Pad", 3, "userDefault");
+$top->optionAdd("*LabFrame*padX", 3, "userDefault");
 
 my $ch = $top->ContextHelp(-widget => 'Message',
 			   -width => 400, -justify => 'right',
@@ -95,6 +95,7 @@ my $ch = $top->ContextHelp(-widget => 'Message',
 	my $pod35 = $f2->Label(-text => '  HelpButton')->pack(-anchor => 'w');
 	my $pod4 = $f2->Label(-text => 'Author')->pack(-anchor => 'w');
 	my $pod5 = $f2->Label(-text => 'See also')->pack(-anchor => 'w');
+
 	$ch->attach($pod1, -pod => '^NAME');
 	$ch->attach($pod2, -pod => '^SYNOPSIS');
 	$ch->attach($pod3, -pod => '^DESCRIPTION');
@@ -170,7 +171,7 @@ not checking for an empty my_save_relief.');
 			  )->pack(-anchor => "w", -fill => "x");
 
     my $qb = $f->Button(-text => 'OK',
-			-command => sub { exit },
+			-command => sub { $top->destroy },
 		       )->pack;
     $ch->attach($qb, -msg => "Click here if you are tired of this demo.");
 }
@@ -238,6 +239,7 @@ if ($ENV{BATCH}) {
 		});
 }
 
-$top->WidgetDump;
+#$top->WidgetDump;
 MainLoop;
 
+print "ok 2\n";
