@@ -1,5 +1,19 @@
 Revision history for Perl extension Tk::ContextHelp.
 
+0.07
+	- Escape works now as expected
+	- new -helpkey option
+	- SimplePod bug fixes
+
+0.06
+	- Tk::Pod is not strictly necessary for the -podfile option
+	- message window does not exceed the screen anymore
+
+0.03
+	- new options -cursor, -offcursor, -callback
+	- new method toggle
+	- HelpButton: toggle stayactive with Button-3
+
 0.02  Fri Feb 20 22:54:46 CET 1998
 	- new option -stayactive
 
