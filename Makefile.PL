@@ -15,6 +15,6 @@ WriteMakefile
     'context_nohelp_mask.xbm' => '$(INST_LIBDIR)/context_nohelp_mask.xbm',
    },
    'PREREQ_PM'  => {'Tk'             => 402.002,
-		    'Tk::Pod'        => 0.4,
+		    #'Tk::Pod'        => 0.4, # optional
 		   },
   );
