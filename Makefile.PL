@@ -16,3 +16,13 @@ WriteMakefile
 		    'Tk::Pod'        => 4, # really only optional
 		   },
   );
+
+sub MY::postamble {
+    if (defined $ENV{USER} && $ENV{USER} eq 'eserte') {
+	<<'EOF';
+release :: $(DISTVNAME).tar$(SUFFIX)
+	cpan-upload $(DISTVNAME).tar$(SUFFIX)
+
+EOF
+    }
+}
