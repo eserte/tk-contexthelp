@@ -17,6 +17,8 @@ use Tk::LabFrame;
 $loaded = 1;
 print "ok 1\n";
 
+if (!defined $ENV{BATCH}) { $ENV{BATCH} = 1 }
+
 ######################### End of black magic.
 
 # Insert your test code below (better if it prints "ok 13"
