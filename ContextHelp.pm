@@ -1,7 +1,7 @@
 # -*- perl -*-
 
 #
-# $Id: ContextHelp.pm,v 1.11 1999/03/13 03:38:08 eserte Exp $
+# $Id: ContextHelp.pm,v 1.12 1999/08/14 21:44:12 eserte Exp $
 # Author: Slaven Rezic
 #
 # Copyright (c) 1998 Slaven Rezic. All rights reserved.
@@ -40,12 +40,6 @@ sub Populate {
     $w->{'inp_only_clients'} = [];
     $w->{'state'} = 'withdrawn';
 
-    my $key = delete $args->{'-helpkey'}; # XXX ConfigSpecs, specify Key?
-    if (defined $key) {
-	$key = '<F1>' if $key !~ /^<.*>$/;
-	$w->parent->toplevel->bind($key => sub { $w->_key_help });
-    }
-
     $w->{'inp_only'} = $w->parent->InputO(-cursor => 'watch');
     $w->{'inp_only'}->bind('<Button-1>' => [ $w, '_next_action']);
     $w->{'inp_only'}->bind('<Button-2>' => [ $w, 'deactivate']);
@@ -68,6 +62,7 @@ sub Populate {
 			     'black', 'white']],
        -stayactive      => ["PASSIVE", "stayActive", "StayActive", 0],
        -callback        => ["CALLBACK", "callback", "Callback", undef],
+       -helpkey         => ["METHOD", "helpKey", "HelpKey", undef],
        DEFAULT          => [$w->{'label'}],
       );
 }
@@ -97,6 +92,8 @@ sub activate {
 	    $cw->configure(-cursor => $cursor);
 	    $cw->raise;
 	}
+	$w->{'old_esc_binding'} = $w->parent->toplevel->bind('<Escape>');
+	$w->parent->toplevel->bind('<Escape>' => [$w, 'deactivate']);
     } elsif ($state eq 'wait') {
 	$w->{'inp_only'}->place('-x' => 0, '-y' => 0,
 				-relwidth => 1.0, -relheight => 1.0,
@@ -300,6 +297,10 @@ sub _reset {
 sub deactivate {
     my($w) = @_;
     $w->_reset;
+    if ($w->{'old_esc_binding'}) {
+	$w->parent->toplevel->bind("<Escape>" => $w->{'old_esc_binding'});
+	delete $w->{'old_esc_binding'};
+    }
     $w->cget(-callback)->Call($w) if $w->cget(-callback);
 }
 
@@ -333,8 +334,6 @@ sub attach {
     $inputo->bind('<Button-1>' => [$w, '_active_state', $inputo]);
     $inputo->bind('<Button-2>' => [$w, 'deactivate']);
     $inputo->bind('<Button-3>' => [$w, 'deactivate']);
-    #$inputo->bind('<Escape>'   => [$w, 'deactivate']);
-    #$inputo->bind('<Key>'      => [$w, 'deactivate']); # XXX InputO does not receive any Key events?!
     $client->OnDestroy([$w, 'detach', $client]);
 }
 
@@ -362,6 +361,19 @@ sub podfile {
 	$w->{Configure}{'podfile'} = $file;
     } else {
 	$w->{Configure}{'podfile'};
+    }
+}
+
+sub helpkey {
+    my $w = shift;
+    if (@_ > 0) {
+	my $key = shift;
+	if (defined $key) {
+	    $key = '<F1>' if $key !~ /^<.*>$/;
+	    $w->parent->toplevel->bind($key => sub { $w->_key_help });
+	}
+    } else {
+	$w->{Configure}{'helpkey'};
     }
 }
 
@@ -413,13 +425,14 @@ sub file {
     my $w = shift;
     if (@_) {
 	my $file = shift;
-	$w->Busy;
+	$w->parent->toplevel->Busy;
 	eval {
 	    my $pid = open(POD, "-|");
 	    if (!$pid) {
 		# I think this is a bad idea when mixing
 		# perl versions:
 		#$ENV{PERL5LIB} = join(":", $ENV{PERL5LIB}, @INC);
+		local($^W) = 0;
 		exec 'perldoc', '-t', $file;
 		# Don't use die, but rather CORE::exit,
 		# which is safer.
@@ -434,7 +447,7 @@ sub file {
 	    }
 	};
 	my $err = $@;
-	$w->Unbusy;
+	$w->parent->toplevel->Unbusy;
 	if ($err) {
 	    warn $err;
 	    $w->{File} = undef;
@@ -490,7 +503,8 @@ question mark.
 
 =item B<-helpkey>
 
-Enable use of a help key. A common choice would be "F1".
+Enable use of a help key. A common choice would be "F1" (or written as
+"<F1>") or maybe "<Help>", if your keyboard has a help key.
 
 =item B<-offcursor>
 
@@ -538,7 +552,11 @@ The argument is the message to be shown in a popup window.
 
 =item B<-pod>
 
-The argument is a regular expression to jump in the corresponding pod file.
+The argument is a regular expression to jump in the corresponding pod
+file. For example, if you have a topic DESCRIPTION where you want to
+jump to, you can specify
+
+    $contexthelp->attach($widget, -pod => '^\s*DESCRIPTION');
 
 =item B<-podfile>
 
@@ -599,6 +617,12 @@ hard to fix. (Maybe a solution: create inputo-widgets for all
 not-attached widgets while in context mode)
 
 =back
+
+=head1 TODO
+
+ * optional use of html browsers (netscape -remote openURL ...)
+
+ * on Win32, make InputO work and use the native help system
 
 =head1 AUTHOR
 
