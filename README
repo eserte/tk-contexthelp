@@ -12,10 +12,11 @@ To install, type
 	$ perl Makefile.PL
 	$ make
 	$ make install
+	$ make test
 
 To start an sample script, type
 
-	$ make test
+	$ env BATCH=0 make test
 
 Additional requirements (it's not essential, but recommended):
 Tk-Pod-0.11.tar.gz or better.
