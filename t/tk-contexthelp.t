@@ -8,8 +8,8 @@
 
 BEGIN { $| = 1; print "1..1\n"; }
 END {print "not ok 1\n" unless $loaded;}
-use Tk::ContextHelp;
 use Tk;
+use Tk::ContextHelp;
 $^W = 1;
 $loaded = 1;
 print "ok 1\n";
@@ -41,6 +41,10 @@ $ch->attach($l1, -msg => 'This is the word "Hello"');
 
 $l2 = $tl->Label(-text => 'World')->pack;
 $ch->attach($l2, -msg => 'This is the word "World"');
+
+$tl->Button(-text => 'No context help',
+	    -command => sub { warn "Ouch!\n"},
+	   )->pack;
 
 eval { require Tk::FireButton };
 if (!$@) {
