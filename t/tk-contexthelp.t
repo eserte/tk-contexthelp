@@ -24,7 +24,9 @@ $top = new MainWindow;
 #$ch = $top->ContextHelp;
 $ch = $top->ContextHelp(-widget => 'Message',
 			-width => 400, -justify => 'right',
-			-podfile => 'Tk::ContextHelp');
+			-podfile => 'Tk::ContextHelp',
+			-helpkey => 'F1',
+		       );
 
 #$ch->attach($top, -msg => 'No context help available for this topic');
 
