@@ -18,11 +18,16 @@ WriteMakefile
   );
 
 sub MY::postamble {
+    my $postamble = "";
+
     if (defined $ENV{USER} && $ENV{USER} eq 'eserte') {
-	<<'EOF';
-release :: $(DISTVNAME).tar$(SUFFIX)
-	cpan-upload $(DISTVNAME).tar$(SUFFIX)
+	$postamble .= <<'EOF';
+
+.include "../../perl.release.mk"
+.include "../../perl.cvs.mk"
 
 EOF
     }
+
+    $postamble;
 }
