@@ -1,5 +1,8 @@
 Revision history for Perl extension Tk::ContextHelp.
 
+0.10
+	- redesign of test script
+
 0.09
 	- save original HelpButton relief
 
