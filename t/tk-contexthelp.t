@@ -20,11 +20,15 @@ print "ok 1\n";
 # (correspondingly "not ok 13") depending on the success of chunk 13
 # of the test code):
 
+use FindBin;
+use lib ($FindBin::RealBin, "$FindBin::RealBin/..");
+
 $top = new MainWindow;
 #$ch = $top->ContextHelp;
 $ch = $top->ContextHelp(-widget => 'Message',
 			-width => 400, -justify => 'right',
 			-podfile => 'Tk::ContextHelp',
+			#-podfile => 'perl',
 			-helpkey => 'F1',
 		       );
 
