@@ -1,7 +1,7 @@
 # -*- perl -*-
 
 #
-# $Id: ContextHelp.pm,v 1.7 1998/02/26 23:58:02 eserte Exp $
+# $Id: ContextHelp.pm,v 1.8 1998/03/03 23:13:35 eserte Exp $
 # Author: Slaven Rezic
 #
 # Copyright (c) 1998 Slaven Rezic. All rights reserved.
@@ -16,7 +16,7 @@ package Tk::ContextHelp;
 use Tk::InputO;
 use strict;
 use vars qw($VERSION @ISA);
-$VERSION = '0.03';
+$VERSION = '0.04';
 @ISA = qw(Tk::Toplevel);
 
 Construct Tk::Widget 'ContextHelp';
@@ -36,6 +36,11 @@ sub Populate {
     $w->{'clients'} = [];
     $w->{'inp_only_clients'} = [];
     $w->{'state'} = 'withdrawn';
+
+    my $key = delete $args->{'-helpkey'}; # XXX ConfigSpecs
+    if (defined $key) {
+	$w->parent->toplevel->bind('<F1>' => sub { $w->_key_help });
+    }
 
     $w->{'inp_only'} = $w->parent->InputO(-cursor => 'watch');
     $w->{'inp_only'}->bind('<Button-1>' => [ $w, '_next_action']);
@@ -105,105 +110,130 @@ sub _active_state {
 	my($rootx, $rooty) = ($x+$parent->rootx,
 			      $y+$parent->rooty);
 	my $under = $parent->containing($rootx, $rooty);
-	
-	my $raise_msg = sub {
-	    my $msg = shift;
-	    if ($w->cget(-installcolormap)) {
-		$w->colormapwindows($parent);
-	    }
-	    $w->{'label'}->configure(-text => $msg);
-	    $w->geometry("+$rootx+$rooty");
-	    $w->deiconify;
-	    $w->raise;
-	    $w->update;
-	    $w->activate($w->cget(-stayactive) ? 'cont' : 'wait');
-	};
-	
-	# test underlying widget and its parents
-	while(defined $under) {
-	    if (exists $w->{'msg'}{$under}) {
-		$raise_msg->($w->{'msg'}{$under});
-		return;
-	    } elsif (exists $w->{'command'}{$under}) {
-		$w->{'command'}{$under}->($under);
-		$w->_next_action;
-		return;
-	    } elsif (exists $w->{'pod'}{$under} ||
-		     exists $w->{'podfile'}{$under}) {
-		my $podfile = $w->{'podfile'}{$under} || $w->cget('-podfile');
-		if (Tk::Exists($w->{'podwindow'})) {
-		    $w->{'podwindow'}->deiconify;
-		    $w->{'podwindow'}->raise;
-		} else {
-		    eval { require Tk::Pod };
-		    if ($@) {
-			$parent->bell;
-			if ($w->cget(-verbose)) {
-			    $raise_msg->("Warning: Can't find Tk::Pod.\n$@");
-			    return;
-			}
-		    } else {
-			$parent->Busy;
-			eval { $w->{'podwindow'} 
-			       = $parent->toplevel->Pod(-file => $podfile) };
-			$parent->Unbusy;
-			if ($@) {
-			    undef $w->{'podwindow'};
-			    $parent->bell;
-			    if ($w->cget(-verbose)) {
-				$raise_msg->("Warning: Can't find POD for <$podfile>.\n$@");
-				return;
-			    }
-			}
-		    }
-		}
-		if ($w->{'podwindow'} && $w->{'pod'}{$under}) {
-		    my $text;
-		    # here comes the *hack*
-		    # find the Text widget of the pod window
-		    foreach ($w->{'podwindow'}{'SubWidget'}{'pod'}
-			     ->children->{'SubWidget'}{'more'}->children) {
-			if ($_->isa('Tk::Text')) {
-			    $text = $_;
-			    last;
-			}
-		    }
-		    if ($text) {
-			$text->tag('configure', 'search',
-				   -background => 'red');
-			$text->tag('remove', 'search', qw/0.0 end/);
-			my $length = 0;
-			# XXX exact or regex search?
-			my $pos = $text->search(-count => \$length,
-						-regexp,
-						'--', $w->{'pod'}{$under},
-						'1.0', 'end');
-			if ($pos) {
-			    $text->tag('add', 'search',
-				       $pos, "$pos + $length char");
-			    $text->see('end');
-			    $text->see($pos);
-			} else {
-			    $parent->bell;
-			    if ($w->cget(-verbose)) {
-				$raise_msg->("Warning: Can't find help topic <$w->{'pod'}{$under}>.");
-				return;
-			    }
-			}
-		    }
-		}
-		$w->_next_action;
-		return;
-	    }
-	    $under = $under->parent;
-	}
-	$parent->bell;
-	if ($w->cget(-verbose)) {
-	    $raise_msg->("Warning: No help available for this topic.");
-	    return;
-	}
+	return $w->_show_help($under, $parent, $rootx, $rooty);
     }
     $w->deactivate;
+}
+
+sub _key_help {
+    my($w) = @_;
+    if ($w->{'state'} eq 'wait') {
+	$w->deactivate;
+    } else {
+	my $parent = $w->parent;
+	my $top = $parent->toplevel;
+	my $e = $top->XEvent;
+	my($x, $y) = ($e->x, $e->y);
+	$w->_reset; # XXX
+	my($rootx, $rooty) = ($x+$parent->rootx,
+			      $y+$parent->rooty);
+	my $under = $parent->containing($rootx, $rooty);
+	$w->_show_help($under, $parent, $rootx, $rooty);
+    }
+}
+
+sub _show_help {
+    my($w, $under, $parent, $rootx, $rooty) = @_;
+    $parent = $under->parent unless defined $parent;
+    $rootx = $under->rootx + int($under->width/2);
+    $rooty = $under->rooty + int($under->height/2);
+
+    my $raise_msg = sub {
+	my $msg = shift;
+	if ($w->cget(-installcolormap)) {
+	    $w->colormapwindows($parent);
+	}
+	$w->{'label'}->configure(-text => $msg);
+	$w->geometry("+$rootx+$rooty");
+	$w->deiconify;
+	$w->raise;
+	$w->update;
+	$w->activate($w->cget(-stayactive) ? 'cont' : 'wait');
+    };
+	
+    # test underlying widget and its parents
+    while(defined $under) {
+	if (exists $w->{'msg'}{$under}) {
+	    $raise_msg->($w->{'msg'}{$under});
+	    return;
+	} elsif (exists $w->{'command'}{$under}) {
+	    $w->{'command'}{$under}->($under);
+	    $w->_next_action;
+	    return;
+	} elsif (exists $w->{'pod'}{$under} ||
+		 exists $w->{'podfile'}{$under}) {
+	    my $podfile = $w->{'podfile'}{$under} || $w->cget('-podfile');
+	    if (Tk::Exists($w->{'podwindow'})) {
+		$w->{'podwindow'}->deiconify;
+		$w->{'podwindow'}->raise;
+	    } else {
+		eval { require Tk::Pod };
+		if ($@) {
+		    $parent->bell;
+		    if ($w->cget(-verbose)) {
+			$raise_msg->("Warning: Can't find Tk::Pod.\n$@");
+			return;
+		    }
+		} else {
+		    $parent->Busy;
+		    eval { $w->{'podwindow'} 
+			   = $parent->toplevel->Pod(-file => $podfile) };
+		    $parent->Unbusy;
+		    if ($@) {
+			undef $w->{'podwindow'};
+			$parent->bell;
+			if ($w->cget(-verbose)) {
+			    $raise_msg->("Warning: Can't find POD for <$podfile>.\n$@");
+			    return;
+			}
+		    }
+		}
+	    }
+	    if ($w->{'podwindow'} && $w->{'pod'}{$under}) {
+		my $text;
+		# here comes the *hack*
+		# find the Text widget of the pod window
+		foreach ($w->{'podwindow'}{'SubWidget'}{'pod'}
+			 ->children->{'SubWidget'}{'more'}->children) {
+		    if ($_->isa('Tk::Text')) {
+			$text = $_;
+			last;
+		    }
+		}
+		if ($text) {
+		    $text->tag('configure', 'search',
+			       -background => 'red');
+		    $text->tag('remove', 'search', qw/0.0 end/);
+		    my $length = 0;
+		    # XXX exact or regex search?
+		    my $pos = $text->search(-count => \$length,
+					    -regexp,
+					    '--', $w->{'pod'}{$under},
+					    '1.0', 'end');
+		    if ($pos) {
+			$text->tag('add', 'search',
+				   $pos, "$pos + $length char");
+			$text->see('end');
+			$text->see($pos);
+		    } else {
+			$parent->bell;
+			if ($w->cget(-verbose)) {
+			    $raise_msg->("Warning: Can't find help topic <$w->{'pod'}{$under}>.");
+			    return;
+			}
+		    }
+		}
+	    }
+	    $w->_next_action;
+	    return;
+	}
+	$under = $under->parent;
+    }
+    $parent->bell;
+    if ($w->cget(-verbose)) {
+	$raise_msg->("Warning: No help available for this topic.");
+	return;
+    }
 }
 
 sub _next_action {
@@ -364,6 +394,10 @@ HelpButton implementations).
 
 Use another cursor for the help mode instead of the left pointer with
 question mark.
+
+=item B<-helpkey>
+
+Enable use of a help key. A common choice would be "F1".
 
 =item B<-offcursor>
 
