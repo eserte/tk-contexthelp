@@ -68,7 +68,8 @@ $f->Label(-text => 'frame')->pack;
 $f2 = $top->Frame(-relief => 'raised',
 		  -bd => 2)->grid(-row => 1, -column => 0);
 $f2->Label(-text => 'POD sections', -fg => 'red')->pack;
-$pod1 = $f2->Label(-text => 'Name')->pack(-anchor => 'w');
+$pod1 = $f2->Label(-text => 'Name',
+		   -bg => '#ffc0c0')->pack(-anchor => 'w');
 $pod2 = $f2->Label(-text => 'Synopsis')->pack(-anchor => 'w');
 $pod3 = $f2->Label(-text => 'Description')->pack(-anchor => 'w');
 $pod30 = $f2->Label(-text => 'Methods')->pack(-anchor => 'w');
@@ -100,5 +101,58 @@ $qb = $top->Button(-text => 'Quit',
 		   -command => sub { exit },
 		  )->grid(-row => 2, -columnspan => 2);
 $ch->attach($qb, -msg => "Click here if you are tired of this demo.");
+
+######################################################################
+
+$top2 = new MainWindow;
+$icon_frame = $top2->Frame(-relief => 'ridge',
+			   -bd => 2)->pack(-fill => 'x', -expand => 1);
+$main_frame = $top2->Frame->pack(-fill => 'both', -expand => 1);
+$ch2 = $main_frame->ContextHelp(-podfile => 'Tk::ContextHelp');
+$hb2 = $icon_frame->Button(-text => 'click here',
+			   -command => [$ch2, 'activate'],
+			  )->pack(-side => 'right');
+$stay_active = 0;
+$cb2 = $icon_frame->Checkbutton
+  (-text => 'stay active',
+   -variable => \$stay_active,
+   -command => sub { $ch2->configure(-stayactive => $stay_active) },
+  )->pack(-side => 'right');
+
+$l20 = $main_frame->Label(-text => 'This is a test label')->pack(-expand => 1,
+							   -fill => 'both');
+$l21 = $main_frame->Label(-text => 'And another test label')->pack(-expand => 1,
+							     -fill => 'both');
+
+$ch2->attach($l20, -msg => 'blah blah blah');
+$ch2->attach($l21, -msg => 'bla blubber foo');
+
+
+$f3 = $main_frame->Frame(-relief => 'raised',
+			 -bd => 2)->pack;
+$f3->Label(-text => 'POD sections', -fg => 'red')->pack;
+$pod1 = $f3->Label(-text => 'Name')->pack(-anchor => 'w');
+$pod2 = $f3->Label(-text => 'Synopsis')->pack(-anchor => 'w');
+$pod3 = $f3->Label(-text => 'Description')->pack(-anchor => 'w');
+$pod30 = $f3->Label(-text => 'Methods')->pack(-anchor => 'w');
+$pod31 = $f3->Label(-text => '  attach')->pack(-anchor => 'w');
+$pod32 = $f3->Label(-text => '  detach')->pack(-anchor => 'w');
+$pod33 = $f3->Label(-text => '  activate')->pack(-anchor => 'w');
+$pod34 = $f3->Label(-text => '  deactivate')->pack(-anchor => 'w');
+$pod35 = $f3->Label(-text => '  HelpButton')->pack(-anchor => 'w');
+$pod4 = $f3->Label(-text => 'Author')->pack(-anchor => 'w');
+$pod5 = $f3->Label(-text => 'See also')->pack(-anchor => 'w');
+$ch2->attach($pod1, -pod => '^NAME');
+$ch2->attach($pod2, -pod => '^SYNOPSIS');
+$ch2->attach($pod3, -pod => '^DESCRIPTION');
+$ch2->attach($pod30, -pod => '^METHODS');
+$ch2->attach($pod31, -pod => '^attach');
+$ch2->attach($pod32, -pod => '^detach');
+$ch2->attach($pod33, -pod => '^activate');
+$ch2->attach($pod34, -pod => '^deactivate');
+$ch2->attach($pod35, -pod => '^HelpButton');
+$ch2->attach($pod4, -pod => '^AUTHOR');
+$ch2->attach($pod5, -pod => '^SEE ALSO');
+
 
 MainLoop;
