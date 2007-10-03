@@ -1,5 +1,8 @@
 Revision history for Perl extension Tk::ContextHelp.
 
+0.11
+	- make sure tests are non-interactive
+
 0.10
 	- redesign of test script
 
