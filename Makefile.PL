@@ -1,4 +1,12 @@
 use ExtUtils::MakeMaker;
+
+if ($^O eq 'MSWin32') {
+    die <<EOF;
+No support for OS.
+Tk::InputO is not available for $^O
+EOF
+}
+
 # See lib/ExtUtils/MakeMaker.pm for details of how to influence
 # the contents of the Makefile that is written.
 WriteMakefile
@@ -14,6 +22,7 @@ WriteMakefile
    },
    'PREREQ_PM'  => {'Tk'             => 402.002,
 		    'Tk::Pod'        => 4, # really only optional
+		    'Tk::InputO'     => 0,
 		   },
   );
 
