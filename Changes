@@ -1,5 +1,8 @@
 Revision history for Perl extension Tk::ContextHelp.
 
+0.12
+	- make sure module is not built at all under MSWin32
+
 0.11
 	- make sure tests are non-interactive
 
