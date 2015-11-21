@@ -3,6 +3,7 @@ matrix:
   include:
     - perl: "5.14"
       env: USE_SYSTEM_PERL=1
+    - perl: "5.22"
     - perl: "5.20"
     - perl: "5.18"
     - perl: "5.16"
@@ -23,5 +24,5 @@ before_install:
  # Wait until window manager is running
  - sleep 2
 install:
- - '[ "$USE_SYSTEM_PERL"  = "1" ] && sudo apt-get install -qq perl-tk || true'
+ - '[ "$USE_SYSTEM_PERL"  = "1" ] && sudo apt-get install -qq perl-tk libtk-pod-perl || true'
  - '[ "$USE_SYSTEM_PERL" != "1" ] && cpanm --quiet --notest --installdeps . || true'
