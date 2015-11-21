@@ -1,4 +1,7 @@
+use strict;
 use ExtUtils::MakeMaker;
+
+my $is_devel_host = defined $ENV{USER} && $ENV{USER} eq 'eserte' && $^O =~ /bsd/i && -f "../../perl.release.mk";
 
 if ($^O eq 'MSWin32') {
     die <<EOF;
@@ -24,16 +27,27 @@ WriteMakefile
 		    'Tk::Pod'        => 4, # really only optional
 		    'Tk::InputO'     => 0,
 		   },
+    (eval { ExtUtils::MakeMaker->VERSION(6.46) } ? (META_MERGE => {
+        'meta-spec' => { version => 2 },
+        resources => {
+            repository => {
+                type => 'git',
+                url  => 'https://github.com/eserte/tk-contexthelp.git',
+                web  => 'https://github.com/eserte/tk-contexthelp',
+            },
+        }})
+     : ()
+    ),
   );
 
 sub MY::postamble {
     my $postamble = "";
 
-    if (defined $ENV{USER} && $ENV{USER} eq 'eserte' && $^O =~ /bsd/i && -f "../../perl.release.mk") {
+    if ($is_devel_host) {
 	$postamble .= <<'EOF';
 
 .include "../../perl.release.mk"
-.include "../../perl.cvs.mk"
+.include "../../perl.git.mk"
 
 EOF
     }
