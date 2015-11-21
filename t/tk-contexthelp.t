@@ -11,6 +11,8 @@ if (!$top) {
 }
 plan tests => 2;
 
+$top->geometry("+1+1"); # for twm
+
 if (!defined $ENV{BATCH}) { $ENV{BATCH} = 1 }
 
 $top->bind('<Escape>' => sub { warn "This is the original binding for Esc\n"});
@@ -221,6 +223,8 @@ if ($ENV{BATCH}) {
 		    $top->destroy if Tk::Exists($top);
 		    $top2->destroy if Tk::Exists($top2);
 		});
+} else {
+    diag 'Please play with the contexthelp window and close the mainwindow yourself.';
 }
 
 #$top->WidgetDump;
