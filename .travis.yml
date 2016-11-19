@@ -11,6 +11,7 @@ matrix:
     - perl: "5.12"
     - perl: "5.10"
     - perl: "5.8"
+
 before_install:
  - sudo apt-get update -qq
  - sudo apt-get install -qq xvfb twm
@@ -26,3 +27,7 @@ before_install:
 install:
  - '[ "$USE_SYSTEM_PERL"  = "1" ] && sudo apt-get install -qq perl-tk libtk-pod-perl || true'
  - '[ "$USE_SYSTEM_PERL" != "1" ] && cpanm --quiet --notest --installdeps . || true'
+
+branches:
+ except:
+  - /appveyor/
